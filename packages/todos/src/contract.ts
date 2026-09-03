@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
+import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
 
 const TodoTitle = Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(80));
 
@@ -35,6 +35,7 @@ export class TodoStorageError extends Schema.TaggedError<TodoStorageError>()(
 
 const endpointErrors = [TodoStorageError] as const;
 
+/** HTTP contract for todos. Client-safe: schemas and endpoints only, no implementation. */
 export class TodosApiGroup extends HttpApiGroup.make("todos")
   .add(
     HttpApiEndpoint.get("list", "/", {
@@ -64,5 +65,3 @@ export class TodosApiGroup extends HttpApiGroup.make("todos")
     }),
   )
   .prefix("/todos") {}
-
-export class StarterApi extends HttpApi.make("StarterApi").add(TodosApiGroup).prefix("/api") {}

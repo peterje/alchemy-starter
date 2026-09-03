@@ -1,0 +1,14 @@
+{
+  "name": "@starter/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/contract.ts",
+    "./server": "./src/server.ts"
+  },
+  "dependencies": {
+    "@starter/todos": "workspace:*",
+    "effect": "4.0.0-rc.110"
+  }
+}

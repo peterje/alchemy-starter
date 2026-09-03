@@ -4,6 +4,8 @@
     "alchemy.run.ts",
     "apps/**/*.ts",
     "apps/**/*.tsx",
+    "packages/api/**/*.ts",
+    "packages/todos/**/*.ts",
     "stacks/**/*.ts",
     "test/**/*.ts",
     "test/**/*.tsx"

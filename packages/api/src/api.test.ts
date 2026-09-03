@@ -1,11 +1,11 @@
 import { afterAll, expect, test } from "bun:test";
 import { Layer, Schema } from "effect";
 import { HttpRouter } from "effect/unstable/http";
-import { Todo } from "./api.ts";
-import { TodosApiRoutes } from "./handlers.ts";
-import { TodoRepositoryMemory } from "./repository-memory.ts";
+import { Todo } from "@starter/todos";
+import { TodoRepositoryMemory } from "@starter/todos/testing";
+import { ApiRoutes } from "./server.ts";
 
-const api = HttpRouter.toWebHandler(TodosApiRoutes.pipe(Layer.provide(TodoRepositoryMemory)), {
+const api = HttpRouter.toWebHandler(ApiRoutes.pipe(Layer.provide(TodoRepositoryMemory)), {
   disableLogger: true,
 });
 const decodeTodo = Schema.decodeUnknownPromise(Todo);

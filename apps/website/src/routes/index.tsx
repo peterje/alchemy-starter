@@ -1,4 +1,5 @@
 import { useAtom, useAtomSuspense } from "@effect/atom-react";
+import { TodoCreate, TodoUpdate } from "@starter/todos";
 import { createFileRoute } from "@tanstack/react-router";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { Suspense } from "react";
@@ -9,7 +10,6 @@ import {
   todosAtom,
   updateTodoAtom,
 } from "../todos/atoms.ts";
-import { TodoCreate, TodoUpdate } from "../todos/api.ts";
 
 export const Route = createFileRoute("/")({
   component: HomePage,

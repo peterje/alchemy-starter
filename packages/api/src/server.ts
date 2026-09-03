@@ -1,10 +1,10 @@
+import { TodoRepository } from "@starter/todos/server";
 import { Effect, Layer } from "effect";
 import { HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { StarterApi } from "./api.ts";
-import { TodoRepository } from "./repository.ts";
+import { StarterApi } from "./contract.ts";
 
-export const TodosApiHandlers = HttpApiBuilder.group(
+const TodosApiHandlers = HttpApiBuilder.group(
   StarterApi,
   "todos",
   Effect.fn(function* (handlers) {
@@ -20,7 +20,8 @@ export const TodosApiHandlers = HttpApiBuilder.group(
   }),
 );
 
-export const TodosApiRoutes = HttpApiBuilder.layer(StarterApi).pipe(
+/** HTTP router for the whole API. Requires each domain's repository Layer from the host. */
+export const ApiRoutes = HttpApiBuilder.layer(StarterApi).pipe(
   Layer.provide(TodosApiHandlers),
   Layer.provide(HttpServer.layerServices),
 );

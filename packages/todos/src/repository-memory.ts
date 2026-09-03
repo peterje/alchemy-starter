@@ -1,5 +1,5 @@
 import { Effect, Layer, Ref } from "effect";
-import { Todo, TodoNotFound } from "./api.ts";
+import { Todo, TodoNotFound } from "./contract.ts";
 import { TodoRepository } from "./repository.ts";
 
 /** In-memory test double for the D1 repository. */

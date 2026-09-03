@@ -27,9 +27,18 @@ Effect Schema + HttpApi contract
   → React UI
 ```
 
-`apps/website/src/todos/api.ts` is shared by the server and browser. Mutations invalidate the same reactivity key as the todo query, so Atom refreshes server state without `useState`, `useEffect`, or a second client-state library.
+The domain lives in packages; the app is a thin host. Each package exposes a client-safe contract as its root entry and keeps implementation behind a `/server` entry:
 
-TanStack server functions are intentionally banned. Add backend behavior to the Effect API under `/api/*`, then expose it to React through `AtomHttpApi`. The `/api/$` server route in `apps/website/src/routes/api.$.ts` hands every request under `/api` to the Effect `HttpApi`, composed with the D1 binding from `cloudflare:workers`.
+| Package          | `.` (client-safe)                      | `./server`                                       |
+| ---------------- | -------------------------------------- | ------------------------------------------------ |
+| `@starter/todos` | schemas, errors, `TodosApiGroup`       | `TodoRepository` service, `TodoRepositoryD1`     |
+| `@starter/api`   | `StarterApi`: every group under `/api` | `ApiRoutes`: handlers mapping groups to services |
+
+Mutations invalidate the same reactivity key as the todo query, so Atom refreshes server state without `useState`, `useEffect`, or a second client-state library.
+
+TanStack server functions are intentionally banned. Add backend behavior as a group in its domain package, register it in `StarterApi`, then expose it to React through `AtomHttpApi`. `apps/website/src/routes/api.$.ts` is the composition root: it binds D1 from `cloudflare:workers` and hands every request under `/api` to `ApiRoutes`.
+
+Three checks keep implementation out of the browser. Package `exports` make `/server` the only path to it. A Vite plugin fails the client build if any `@starter/*/server`, `@starter/*/testing`, or `cloudflare:workers` import reaches the client graph. `tools/workspace-boundaries.test.ts` allows `/server` imports only from the composition root, which also covers loaders, since those run on both sides.
 
 Routes are client-rendered by default (`defaultSsr: false` in `src/start.ts`), so the Worker only renders the document shell. A route can opt into SSR with `ssr: true` if it ever needs it.
 
@@ -58,8 +67,10 @@ bun run ci:provision
 ## Layout
 
 ```text
-apps/website/src/todos        shared API, Atom client, handlers, repositories
-apps/website/src/routes/api.$.ts  /api server route: D1 binding into the Effect API
+packages/todos                todo domain: contract, repository service, D1 adapter
+packages/api                  the HttpApi: groups under /api, handlers, API test
+apps/website/src/routes/api.$.ts  composition root: D1 binding into ApiRoutes
+apps/website/src/todos/atoms.ts   AtomHttpApi client over the contract
 apps/website/src/start.ts     TanStack Start instance, client-rendered by default
 apps/website/migrations       D1 schema
 apps/website/test/browser     end-to-end AtomHttpApi CRUD coverage

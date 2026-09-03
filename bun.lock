@@ -30,6 +30,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@effect/atom-react": "4.0.0-rc.110",
+        "@starter/api": "workspace:*",
+        "@starter/todos": "workspace:*",
         "@tanstack/react-router": "1.167.4",
         "@tanstack/react-start": "1.166.15",
         "effect": "4.0.0-rc.110",
@@ -43,6 +45,14 @@
         "vite": "8.0.7",
       },
     },
+    "packages/api": {
+      "name": "@starter/api",
+      "version": "0.0.0",
+      "dependencies": {
+        "@starter/todos": "workspace:*",
+        "effect": "4.0.0-rc.110",
+      },
+    },
     "packages/oxlint-plugins": {
       "name": "@starter/oxlint-plugins",
       "version": "0.0.0",
@@ -51,6 +61,13 @@
       },
       "devDependencies": {
         "oxlint": "1.79.0",
+      },
+    },
+    "packages/todos": {
+      "name": "@starter/todos",
+      "version": "0.0.0",
+      "dependencies": {
+        "effect": "4.0.0-rc.110",
       },
     },
   },
@@ -610,7 +627,11 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
+    "@starter/api": ["@starter/api@workspace:packages/api"],
+
     "@starter/oxlint-plugins": ["@starter/oxlint-plugins@workspace:packages/oxlint-plugins"],
+
+    "@starter/todos": ["@starter/todos@workspace:packages/todos"],
 
     "@starter/website": ["@starter/website@workspace:apps/website"],
 

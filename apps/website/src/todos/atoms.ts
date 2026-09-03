@@ -1,6 +1,6 @@
+import { StarterApi } from "@starter/api";
 import { FetchHttpClient } from "effect/unstable/http";
 import { AtomHttpApi } from "effect/unstable/reactivity";
-import { StarterApi } from "./api.ts";
 
 export const TodoApiClient = AtomHttpApi.Service()("starter/TodoApiClient", {
   api: StarterApi,

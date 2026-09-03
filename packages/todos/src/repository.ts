@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { Todo, TodoCreate, TodoNotFound, TodoStorageError, TodoUpdate } from "./api.ts";
+import type { Todo, TodoCreate, TodoNotFound, TodoStorageError, TodoUpdate } from "./contract.ts";
 
 export class TodoRepository extends Context.Service<
   TodoRepository,

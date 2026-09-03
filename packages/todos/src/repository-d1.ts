@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { Todo, TodoNotFound, TodoStorageError } from "./api.ts";
+import { Todo, TodoNotFound, TodoStorageError } from "./contract.ts";
 import { TodoRepository } from "./repository.ts";
 
 interface TodoRow {
