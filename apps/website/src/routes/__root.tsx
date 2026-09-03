@@ -12,11 +12,16 @@ export const Route = createRootRoute({
       { title: "Alchemy + Effect starter" },
     ],
   }),
-  // Routes are client-rendered (see start.ts), so the document must be the
-  // shell component: it is the only part the Worker renders on the server.
+  // The Worker always emits this document. Page chrome lives here so the LCP
+  // heading is in the first HTML even when a child route is client-rendered.
   shellComponent: Document,
+  pendingComponent: PendingTodos,
   component: RootComponent,
 });
+
+function PendingTodos() {
+  return <p className="status">Loading todos…</p>;
+}
 
 function RootComponent() {
   return (
@@ -33,7 +38,15 @@ function Document({ children }: Readonly<{ children: ReactNode }>) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <main className="demo-app">
+          <p className="eyebrow">Alchemy + Effect starter</p>
+          <h1>Effect all the way down.</h1>
+          <p className="lede">
+            A schema-first Effect API persists todos in Cloudflare D1. AtomHttpApi drives every
+            client query and mutation without React local state.
+          </p>
+          {children}
+        </main>
         <Scripts />
       </body>
     </html>

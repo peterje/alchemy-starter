@@ -1,9 +1,9 @@
 import { createStart } from "@tanstack/react-start";
 
 /**
- * Client-rendered by default. The Worker serves the document shell and the
- * Effect API; routes opt into SSR individually if they ever need it.
+ * Render matching routes on the first request so the todo UI is in the HTML.
+ * Client-only routes can still set `ssr: false`.
  */
 export const startInstance = createStart(() => ({
-  defaultSsr: false,
+  defaultSsr: true,
 }));

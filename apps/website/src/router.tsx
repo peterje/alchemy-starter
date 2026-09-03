@@ -6,6 +6,7 @@ export function getRouter() {
   return createRouter({
     routeTree,
     scrollRestoration: false,
+    defaultPendingMinMs: 0,
   });
 }
 

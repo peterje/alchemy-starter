@@ -12,22 +12,15 @@ import {
 } from "../todos/atoms.ts";
 
 export const Route = createFileRoute("/")({
+  ssr: true,
   component: HomePage,
 });
 
 function HomePage() {
   return (
-    <main className="demo-app">
-      <p className="eyebrow">Alchemy + Effect starter</p>
-      <h1>Effect all the way down.</h1>
-      <p className="lede">
-        A schema-first Effect API persists todos in Cloudflare D1. AtomHttpApi drives every client
-        query and mutation without React local state.
-      </p>
-      <Suspense fallback={<p className="status">Loading todos…</p>}>
-        <TodoManager />
-      </Suspense>
-    </main>
+    <Suspense fallback={<p className="status">Loading todos…</p>}>
+      <TodoManager />
+    </Suspense>
   );
 }
 
