@@ -6,12 +6,6 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [
     tanstackStart({
-      spa: {
-        enabled: true,
-      },
-      server: {
-        entry: "./server.ts",
-      },
       router: {
         generatedRouteTree: "./.tanstack/routeTree.gen.ts",
       },

@@ -12,7 +12,6 @@ import {
 import { TodoCreate, TodoUpdate } from "../todos/api.ts";
 
 export const Route = createFileRoute("/")({
-  ssr: false,
   component: HomePage,
 });
 

@@ -3,7 +3,7 @@
 GitHub template for an Effect-native Alchemy + React application:
 
 - Alchemy 2 on Cloudflare Workers (`bun run dev` / `bun run deploy`)
-- TanStack Start SPA mode with every backend endpoint under `/api/*`
+- TanStack Start, client-rendered by default, with every backend endpoint under `/api/*`
 - Schema-first Effect `HttpApi` backed by Cloudflare D1
 - Effect `AtomHttpApi` queries and mutations with React Atom bindings
 - No React local state, effect hooks, or TanStack server functions in application code
@@ -29,7 +29,9 @@ Effect Schema + HttpApi contract
 
 `apps/website/src/todos/api.ts` is shared by the server and browser. Mutations invalidate the same reactivity key as the todo query, so Atom refreshes server state without `useState`, `useEffect`, or a second client-state library.
 
-TanStack server functions are intentionally banned. Add backend behavior to the Effect API under `/api/*`, then expose it to React through `AtomHttpApi`.
+TanStack server functions are intentionally banned. Add backend behavior to the Effect API under `/api/*`, then expose it to React through `AtomHttpApi`. The `/api/$` server route in `apps/website/src/routes/api.$.ts` hands every request under `/api` to the Effect `HttpApi`, composed with the D1 binding from `cloudflare:workers`.
+
+Routes are client-rendered by default (`defaultSsr: false` in `src/start.ts`), so the Worker only renders the document shell. A route can opt into SSR with `ssr: true` if it ever needs it.
 
 - [Effect Atom](https://www.effect.website/docs/v4/api/effect/unstable/reactivity/Atom)
 - [Effect AtomHttpApi](https://www.effect.website/docs/v4/api/effect/unstable/reactivity/AtomHttpApi)
@@ -45,7 +47,7 @@ bun run doctor       # React Doctor on the changed scope
 bun run deploy       # production Worker and D1 database
 ```
 
-`alchemy dev` runs the Worker in local workerd with a local D1 database, so development and the browser suite exercise the same server entry and D1 repository as production. The API unit test swaps in an in-memory repository Layer; nothing else knows it exists.
+`alchemy dev` runs the Worker in local workerd with a local D1 database, so development and the browser suite exercise the same routes and D1 repository as production. The API unit test swaps in an in-memory repository Layer; nothing else knows it exists.
 
 Provision GitHub Actions Cloudflare secrets and enable production deploys once:
 
@@ -57,8 +59,8 @@ bun run ci:provision
 
 ```text
 apps/website/src/todos        shared API, Atom client, handlers, repositories
-apps/website/src/server.ts    /api boundary before the SPA handler
-apps/website/src/todos/worker.ts  Worker composition root: D1 binding into the Effect API
+apps/website/src/routes/api.$.ts  /api server route: D1 binding into the Effect API
+apps/website/src/start.ts     TanStack Start instance, client-rendered by default
 apps/website/migrations       D1 schema
 apps/website/test/browser     end-to-end AtomHttpApi CRUD coverage
 packages/oxlint-plugins       shared TypeScript, Effect, and React architecture rules

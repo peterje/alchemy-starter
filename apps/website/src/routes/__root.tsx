@@ -12,16 +12,17 @@ export const Route = createRootRoute({
       { title: "Alchemy + Effect starter" },
     ],
   }),
+  // Routes are client-rendered (see start.ts), so the document must be the
+  // shell component: it is the only part the Worker renders on the server.
+  shellComponent: Document,
   component: RootComponent,
 });
 
 function RootComponent() {
   return (
-    <Document>
-      <RegistryProvider>
-        <Outlet />
-      </RegistryProvider>
-    </Document>
+    <RegistryProvider>
+      <Outlet />
+    </RegistryProvider>
   );
 }
 
