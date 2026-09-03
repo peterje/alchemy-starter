@@ -12,7 +12,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "bun run dev",
+    command: "cd apps/website && bun run dev",
     url: "http://localhost:1337",
     reuseExistingServer: true,
     timeout: 120_000,

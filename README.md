@@ -3,6 +3,7 @@
 GitHub template for a small Alchemy + React demo with the same verification toolchain used in [chemistry](https://github.com/peterje/chemistry):
 
 - Alchemy 2 on Cloudflare Workers (`bun run dev` / `bun run deploy`)
+- TanStack Start SPA mode with server functions and routes reserved under `/api/*`
 - Bun workspaces, TypeScript 7 strictness, conventional commits
 - oxlint **anti-slop** (plus Effect rules), oxfmt, lefthook `bun run check`
 - Playwright browser integration on `main`
@@ -17,12 +18,12 @@ The app itself is a one-page counter. Use this repo as a GitHub template, then r
 bun install
 bun run dev          # http://localhost:1337
 bun run check        # format, lint, types, unit tests, build
-bun run test:browser # Playwright against alchemy dev
+bun run test:browser # Playwright against the local SPA
 bun run doctor       # React Doctor on the changed scope
 bun run deploy       # production Worker
 ```
 
-Provision GitHub Actions Cloudflare secrets once:
+Provision GitHub Actions Cloudflare secrets and enable production deploys once:
 
 ```bash
 bun run ci:provision

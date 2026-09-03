@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && rm -rf .tanstack src/.tanstack",
+    "build": "vite build && test -f dist/client/_shell.html && rm -rf .tanstack src/.tanstack",
+    "dev": "vite --host 127.0.0.1 --port 1337",
     "preview": "vite preview"
   },
   "dependencies": {

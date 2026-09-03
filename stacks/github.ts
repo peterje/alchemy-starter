@@ -49,5 +49,11 @@ export default Alchemy.Stack(
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: Redacted.make(accountId),
     });
+    yield* GitHub.Variable("cloudflare-deploy-enabled", {
+      owner: GITHUB_OWNER,
+      repository: GITHUB_REPOSITORY,
+      name: "CLOUDFLARE_DEPLOY_ENABLED",
+      value: "true",
+    });
   }),
 );

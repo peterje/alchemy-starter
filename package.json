@@ -13,7 +13,7 @@
     "preview": "cd apps/website && bun run preview",
     "deploy": "alchemy deploy",
     "destroy": "alchemy destroy",
-    "ci:provision": "alchemy deploy stacks/github.ts --profile admin --stage infrastructure",
+    "ci:provision": "alchemy deploy stacks/github.ts --stage infrastructure",
     "prepare": "lefthook install",
     "lint": "bun --bun oxlint .",
     "typecheck": "tsc --noEmit",
@@ -25,6 +25,8 @@
     "doctor": "npx react-doctor@latest --verbose --scope changed"
   },
   "dependencies": {
+    "@effect/platform-bun": "4.0.0-rc.110",
+    "@effect/platform-node": "4.0.0-rc.110",
     "alchemy": "2.0.0-beta.72",
     "effect": "4.0.0-rc.110"
   },
@@ -50,5 +52,6 @@
     "extends": [
       "@commitlint/config-conventional"
     ]
-  }
+  },
+  "packageManager": "bun@1.4.0"
 }
