@@ -2,19 +2,7 @@ import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Effect from "effect/Effect";
 
-/** Cloudflare-hosted Vite website for the starter demo. */
-export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
-  rootDir: "apps/website",
-  memo: {
-    include: ["**/*"],
-    lockfile: true,
-  },
-  compatibility: {
-    flags: ["nodejs_compat"],
-  },
-}) {}
-
-/** Deployable Alchemy stack for the demo website. */
+/** Deployable Alchemy stack for the SPA, Effect API, and its D1 state. */
 export default Alchemy.Stack(
   "Starter",
   {
@@ -22,7 +10,23 @@ export default Alchemy.Stack(
     state: Cloudflare.state(),
   },
   Effect.gen(function* () {
-    const website = yield* Website;
+    const todos = yield* Cloudflare.D1.Database("Todos", {
+      migrationsDir: "apps/website/migrations",
+    });
+    const website = yield* Cloudflare.Website.Vite<{ TODOS: typeof todos }>("Website", {
+      rootDir: "apps/website",
+      memo: {
+        include: ["**/*"],
+        lockfile: true,
+      },
+      compatibility: {
+        flags: ["nodejs_compat"],
+      },
+      env: {
+        TODOS: todos,
+      },
+    });
+
     return {
       websiteUrl: website.url.as<string>(),
     };

@@ -9,8 +9,8 @@ export default defineConfig({
       spa: {
         enabled: true,
       },
-      serverFns: {
-        base: "/api/server-fn",
+      server: {
+        entry: "./server.ts",
       },
       router: {
         generatedRouteTree: "./.tanstack/routeTree.gen.ts",
@@ -18,6 +18,11 @@ export default defineConfig({
     }),
     viteReact(),
   ],
+  server: {
+    proxy: {
+      "/api/todos": "http://127.0.0.1:1338",
+    },
+  },
   build: {
     rollupOptions: {
       external: ["cloudflare:workers"],

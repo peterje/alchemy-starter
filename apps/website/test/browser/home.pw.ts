@@ -1,15 +1,19 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const openHome = async (page: Page): Promise<void> => {
+test("the Effect Atom client completes the todo lifecycle", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Starter" })).toBeVisible();
-};
+  await expect(page.getByRole("heading", { name: "Effect all the way down." })).toBeVisible();
+  await expect(page.getByText("Nothing here yet.")).toBeVisible();
 
-test("the demo home page renders and increments", async ({ page }) => {
-  await openHome(page);
-  await expect(page.getByText("Count 0")).toBeVisible();
-  await expect(page.locator("[data-phase='idle']")).toHaveText("Idle");
-  await page.getByRole("button", { name: "Increment" }).click();
-  await expect(page.getByText("Count 1")).toBeVisible();
-  await expect(page.locator("[data-phase='ready']")).toHaveText("Ready");
+  await page.getByLabel("Add a todo").fill("Ship the Effect example");
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByText("Ship the Effect example")).toBeVisible();
+  await expect(page.getByText("1 total")).toBeVisible();
+
+  await page.getByRole("button", { name: "Complete Ship the Effect example" }).click();
+  await expect(page.getByText("Ship the Effect example")).toHaveClass(/completed/);
+
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Nothing here yet.")).toBeVisible();
+  await expect(page.getByText("0 total")).toBeVisible();
 });
