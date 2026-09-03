@@ -1,6 +1,6 @@
 :root {
   color: #202123;
-  background: #ffffff;
+  background: #f8f7f3;
   font-family:
     Inter,
     ui-sans-serif,
@@ -8,10 +8,11 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  --muted: #6e6e80;
-  --line: #e5e5e8;
-  --soft: #f4f4f4;
+  --muted: #696965;
+  --line: #d9d7cf;
+  --surface: #ffffff;
   --accent: #166534;
+  --danger: #9f1239;
 }
 
 * {
@@ -21,74 +22,205 @@
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
   margin: 0;
 }
 
-button:focus-visible {
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
 
 .demo-app {
-  max-width: 40rem;
+  max-width: 44rem;
   margin: 0 auto;
-  padding: 4rem 1.5rem;
+  padding: 5rem 1.5rem;
 }
 
 .eyebrow {
   margin: 0 0 0.65rem;
   color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-h1 {
+h1,
+h2 {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 3rem);
   letter-spacing: -0.04em;
 }
 
+h1 {
+  max-width: 11ch;
+  font-size: clamp(2.5rem, 8vw, 4.75rem);
+  line-height: 0.98;
+}
+
+h2 {
+  font-size: 1.5rem;
+}
+
 .lede {
-  margin: 1rem 0 1.75rem;
+  max-width: 39rem;
+  margin: 1.5rem 0 3.5rem;
   color: var(--muted);
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
-.phase {
-  margin: 0 0 1.25rem;
-  color: var(--accent);
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.demo-actions {
+.section-heading,
+.todo-input-row,
+.todo-item {
   display: flex;
   align-items: center;
+}
+
+.section-heading {
+  justify-content: space-between;
   gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-heading .eyebrow {
+  margin-bottom: 0.25rem;
+}
+
+.count,
+.status,
+.empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.todo-form {
+  padding: 1.5rem 0;
+}
+
+.todo-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.todo-input-row {
+  gap: 0.5rem;
+}
+
+.todo-input-row input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  padding: 0.75rem 0.85rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .primary {
   border: 0;
-  border-radius: 0.7rem;
-  background: #18181b;
+  border-radius: 0.45rem;
+  background: #202123;
   color: #fff;
-  padding: 0.7rem 1rem;
-  cursor: pointer;
-  font: inherit;
+  padding: 0.8rem 1.1rem;
+  font-weight: 650;
 }
 
-.primary:hover {
-  background: #27272a;
+.primary:hover:not(:disabled) {
+  background: #363638;
 }
 
-.count {
+.status,
+.empty {
+  margin: 1.25rem 0 0;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.todo-list {
   margin: 0;
-  font-size: 0.95rem;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.todo-item {
+  gap: 0.75rem;
+  min-height: 3.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.toggle {
+  display: grid;
+  width: 1.3rem;
+  height: 1.3rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #989891;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #dcfce7;
+}
+
+.todo-title {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.todo-title.completed {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.delete {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.delete:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+@media (max-width: 34rem) {
+  .demo-app {
+    padding-top: 3rem;
+  }
+
+  .todo-input-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
