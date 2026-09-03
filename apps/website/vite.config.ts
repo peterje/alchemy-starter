@@ -18,11 +18,6 @@ export default defineConfig({
     }),
     viteReact(),
   ],
-  server: {
-    proxy: {
-      "/api/todos": "http://127.0.0.1:1338",
-    },
-  },
   build: {
     rollupOptions: {
       external: ["cloudflare:workers"],

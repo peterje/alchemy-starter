@@ -11,18 +11,12 @@ export default defineConfig({
     baseURL: "http://localhost:1337",
     trace: "retain-on-failure",
   },
-  webServer: [
-    {
-      command: "cd apps/website && bun run dev:api",
-      url: "http://127.0.0.1:1338/api/todos/",
-      reuseExistingServer: true,
-      timeout: 120_000,
-    },
-    {
-      command: "cd apps/website && bun run dev",
-      url: "http://localhost:1337",
-      reuseExistingServer: true,
-      timeout: 120_000,
-    },
-  ],
+  // `alchemy dev` runs the Worker in local workerd with a local D1, so the
+  // suite exercises the same server entry and repository as production.
+  webServer: {
+    command: "bun run dev",
+    url: "http://localhost:1337",
+    reuseExistingServer: true,
+    timeout: 180_000,
+  },
 });

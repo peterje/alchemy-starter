@@ -65,4 +65,6 @@ export class TodosApiGroup extends HttpApiGroup.make("todos")
   )
   .prefix("/todos") {}
 
-export class StarterApi extends HttpApi.make("StarterApi").add(TodosApiGroup).prefix("/api") {}
+export const apiPrefix = "/api";
+
+export class StarterApi extends HttpApi.make("StarterApi").add(TodosApiGroup).prefix(apiPrefix) {}

@@ -6,7 +6,6 @@
   "scripts": {
     "build": "vite build && test -f dist/client/_shell.html && rm -rf .tanstack src/.tanstack",
     "dev": "vite --host 127.0.0.1 --port 1337",
-    "dev:api": "bun src/todos/dev-server.ts",
     "preview": "vite preview"
   },
   "dependencies": {

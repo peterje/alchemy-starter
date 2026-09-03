@@ -40,12 +40,12 @@ TanStack server functions are intentionally banned. Add backend behavior to the 
 bun install
 bun run dev          # Alchemy dev server at http://localhost:1337
 bun run check        # format, lint, types, tests, plugin tests, build
-bun run test:browser # Playwright against the SPA and local Effect API
+bun run test:browser # Playwright against `alchemy dev` (local workerd + D1)
 bun run doctor       # React Doctor on the changed scope
 bun run deploy       # production Worker and D1 database
 ```
 
-The API and browser suites use an in-memory implementation of the same Effect repository service. Production supplies the D1 Layer instead, keeping test infrastructure out of application code.
+`alchemy dev` runs the Worker in local workerd with a local D1 database, so development and the browser suite exercise the same server entry and D1 repository as production. The API unit test swaps in an in-memory repository Layer; nothing else knows it exists.
 
 Provision GitHub Actions Cloudflare secrets and enable production deploys once:
 
@@ -58,6 +58,7 @@ bun run ci:provision
 ```text
 apps/website/src/todos        shared API, Atom client, handlers, repositories
 apps/website/src/server.ts    /api boundary before the SPA handler
+apps/website/src/todos/worker.ts  Worker composition root: D1 binding into the Effect API
 apps/website/migrations       D1 schema
 apps/website/test/browser     end-to-end AtomHttpApi CRUD coverage
 packages/oxlint-plugins       shared TypeScript, Effect, and React architecture rules
