@@ -25,6 +25,8 @@ test("the notes demo supports CRUD, user isolation, and reloads", async ({ page 
   const note = page.getByRole("article", { name: "First note" });
   await expect(note).toBeVisible();
   await expect(page.getByLabel("Title", { exact: true }).first()).toHaveValue("");
+  const html = await (await page.request.get("/")).text();
+  expect(html).toContain('<article aria-label="First note">');
 
   await page.getByLabel("Demo user").selectOption("bob");
   await expect(page.getByText("No notes yet.", { exact: false })).toBeVisible();

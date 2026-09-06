@@ -13,7 +13,7 @@ export default defineConfig({
   },
   // Use a dedicated stage and port so tests never clear a developer's demo notes.
   webServer: {
-    command: "PORT=1341 bun run dev --stage browser-test",
+    command: "PORT=1341 API_PORT=1342 bun run dev --stage browser-test",
     url: "http://localhost:1341",
     reuseExistingServer: false,
     timeout: 180_000,

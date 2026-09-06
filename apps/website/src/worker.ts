@@ -1,22 +1,9 @@
-import { DurableObject, env } from "cloudflare:workers";
-import { Clock, Effect, Layer, Schema } from "effect";
-import {
-  HttpRouter,
-  HttpServer,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "effect/unstable/http";
+import * as Cloudflare from "alchemy/Cloudflare";
+import type { HttpEffect } from "alchemy/Http";
+import { Clock, Config, Effect, Layer, Schema } from "effect";
+import { HttpRouter, HttpServer, HttpServerRequest } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Note, NoteId, NoteNotFound, NoteStorageError, NotesApi, type UserId } from "./notes.ts";
-
-declare module "cloudflare:workers" {
-  namespace Cloudflare {
-    interface Env {
-      NOTES: DurableObjectNamespace<UserNotes>;
-      ASSETS: Fetcher;
-    }
-  }
-}
 
 // Append only: every user's database applies these on its next activation.
 const migrations = [
@@ -37,11 +24,16 @@ const migrations = [
 ];
 const columns = "id, title, body, created_at AS createdAt, updated_at AS updatedAt";
 
-/** Alchemy registers this class on the Vite Worker. Each named instance owns its SQLite database. */
-export class UserNotes extends DurableObject {
-  private readonly handlers = HttpApiBuilder.group(NotesApi, "notes", (handlers) => {
-    const storage = this.ctx.storage;
+/** The outer Effect discovers bindings; the inner Effect initializes each user's instance. */
+export class UserNotes extends Cloudflare.DurableObject<UserNotes, { fetch: HttpEffect }>()(
+  "UserNotes",
+) {}
+
+const UserNotesLive = UserNotes.make<never>(
+  Effect.gen(function* () {
+    const state = yield* Cloudflare.DurableObjectState;
     return Effect.gen(function* () {
+      const storage = state.raw.storage;
       // No asynchronous work inside transactionSync: schema and history commit together.
       // A failed initialization must not serve requests against a partial schema.
       yield* Effect.sync(() => {
@@ -85,104 +77,108 @@ export class UserNotes extends DurableObject {
         return note === undefined ? yield* Effect.fail(new NoteNotFound({ id })) : note;
       });
 
-      return handlers.handleAll({
-        // Keep the demo response bounded; introduce pagination for larger histories.
-        list: Effect.fn("Notes.list")(function* () {
-          return yield* query(
-            "list",
-            `SELECT ${columns} FROM notes ORDER BY updated_at DESC, id ASC LIMIT 100`,
-          );
+      const handlers = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
+        handlers.handleAll({
+          // Keep the demo response bounded; introduce pagination for larger histories.
+          list: Effect.fn("Notes.list")(function* () {
+            return yield* query(
+              "list",
+              `SELECT ${columns} FROM notes ORDER BY updated_at DESC, id ASC LIMIT 100`,
+            );
+          }),
+          get: Effect.fn("Notes.get")(function* ({ params }) {
+            return yield* query("get", `SELECT ${columns} FROM notes WHERE id = ?`, params.id).pipe(
+              Effect.flatMap((rows) => requireNote(params.id, rows)),
+            );
+          }),
+          create: Effect.fn("Notes.create")(function* ({ payload }) {
+            const id = yield* Effect.sync(() => NoteId.make(crypto.randomUUID()));
+            const now = yield* Clock.currentTimeMillis;
+            const rows = yield* query(
+              "create",
+              `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${columns}`,
+              id,
+              payload.title,
+              payload.body,
+              now,
+              now,
+            );
+            const note = rows[0];
+            return note === undefined
+              ? yield* Effect.fail(new NoteStorageError({ operation: "create" }))
+              : note;
+          }),
+          update: Effect.fn("Notes.update")(function* ({ params, payload }) {
+            const now = yield* Clock.currentTimeMillis;
+            return yield* query(
+              "update",
+              `UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING ${columns}`,
+              payload.title,
+              payload.body,
+              now,
+              params.id,
+            ).pipe(Effect.flatMap((rows) => requireNote(params.id, rows)));
+          }),
+          remove: Effect.fn("Notes.remove")(function* ({ params }) {
+            return yield* query(
+              "remove",
+              `DELETE FROM notes WHERE id = ? RETURNING ${columns}`,
+              params.id,
+            ).pipe(Effect.flatMap((rows) => requireNote(params.id, rows)));
+          }),
         }),
-        get: Effect.fn("Notes.get")(function* ({ params }) {
-          return yield* query("get", `SELECT ${columns} FROM notes WHERE id = ?`, params.id).pipe(
-            Effect.flatMap((rows) => requireNote(params.id, rows)),
-          );
-        }),
-        create: Effect.fn("Notes.create")(function* ({ payload }) {
-          const id = yield* Effect.sync(() => NoteId.make(crypto.randomUUID()));
-          const now = yield* Clock.currentTimeMillis;
-          const rows = yield* query(
-            "create",
-            `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${columns}`,
-            id,
-            payload.title,
-            payload.body,
-            now,
-            now,
-          );
-          const note = rows[0];
-          return note === undefined
-            ? yield* Effect.fail(new NoteStorageError({ operation: "create" }))
-            : note;
-        }),
-        update: Effect.fn("Notes.update")(function* ({ params, payload }) {
-          const now = yield* Clock.currentTimeMillis;
-          return yield* query(
-            "update",
-            `UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING ${columns}`,
-            payload.title,
-            payload.body,
-            now,
-            params.id,
-          ).pipe(Effect.flatMap((rows) => requireNote(params.id, rows)));
-        }),
-        remove: Effect.fn("Notes.remove")(function* ({ params }) {
-          return yield* query(
-            "remove",
-            `DELETE FROM notes WHERE id = ? RETURNING ${columns}`,
-            params.id,
-          ).pipe(Effect.flatMap((rows) => requireNote(params.id, rows)));
-        }),
-      });
+      );
+      return {
+        fetch: yield* HttpRouter.toHttpEffect(
+          HttpApiBuilder.layer(NotesApi).pipe(
+            Layer.provide(handlers),
+            Layer.provide(HttpServer.layerServices),
+          ),
+        ),
+      };
     });
-  });
-
-  // Layer initialization is memoized per object. SQLite has no disposable connection to retain.
-  private readonly api = HttpRouter.toWebHandler(
-    HttpApiBuilder.layer(NotesApi).pipe(
-      Layer.provide(this.handlers),
-      Layer.provide(HttpServer.layerServices),
-    ),
-  );
-
-  override fetch(request: Request): Promise<Response> {
-    return this.api.handler(request);
-  }
-}
-
-const forward = Effect.fn("Notes.forward")(function* (
-  userId: UserId,
-  request: HttpServerRequest.HttpServerRequest,
-) {
-  // Demo routing only. In an authenticated app, derive userId from the verified session.
-  return yield* HttpServerRequest.toWeb(request).pipe(
-    Effect.flatMap((webRequest) =>
-      Effect.tryPromise(() => env.NOTES.getByName(userId).fetch(webRequest)),
-    ),
-    Effect.map(HttpServerResponse.fromWeb),
-    Effect.tapError(Effect.logError),
-    Effect.mapError(() => new NoteStorageError({ operation: "forward" })),
-  );
-});
-const proxy = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
-  handlers
-    .handleRaw("list", ({ params, request }) => forward(params.userId, request))
-    .handleRaw("get", ({ params, request }) => forward(params.userId, request))
-    .handleRaw("create", ({ params, request }) => forward(params.userId, request))
-    .handleRaw("update", ({ params, request }) => forward(params.userId, request))
-    .handleRaw("remove", ({ params, request }) => forward(params.userId, request)),
-);
-const api = HttpRouter.toWebHandler(
-  HttpApiBuilder.layer(NotesApi).pipe(
-    Layer.provide(proxy),
-    Layer.provide(HttpServer.layerServices),
-  ),
+  }),
 );
 
-export default {
-  fetch(request: Request): Promise<Response> {
-    return new URL(request.url).pathname.startsWith("/api/")
-      ? api.handler(request)
-      : env.ASSETS.fetch(request);
-  },
-};
+export default class NotesWorker extends Cloudflare.Worker<NotesWorker>()(
+  "NotesApi",
+  Effect.gen(function* () {
+    return {
+      main: import.meta.url,
+      workersDev: false,
+      dev: { port: yield* Config.number("API_PORT").pipe(Config.withDefault(1338), Effect.orDie) },
+    };
+  }),
+  Effect.gen(function* () {
+    const notes = yield* UserNotes;
+    const forward = Effect.fn("Notes.forward")(function* (
+      userId: UserId,
+      request: HttpServerRequest.HttpServerRequest,
+    ) {
+      // Demo routing only. Select the object from a verified session before storing private data.
+      return yield* notes
+        .getByName(userId)
+        .fetch(request)
+        .pipe(
+          Effect.tapError(Effect.logError),
+          Effect.mapError(() => new NoteStorageError({ operation: "forward" })),
+        );
+    });
+    const proxy = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
+      handlers
+        .handleRaw("list", ({ params, request }) => forward(params.userId, request))
+        .handleRaw("get", ({ params, request }) => forward(params.userId, request))
+        .handleRaw("create", ({ params, request }) => forward(params.userId, request))
+        .handleRaw("update", ({ params, request }) => forward(params.userId, request))
+        .handleRaw("remove", ({ params, request }) => forward(params.userId, request)),
+    );
+    return {
+      fetch: yield* HttpRouter.toHttpEffect(
+        HttpApiBuilder.layer(NotesApi).pipe(
+          Layer.provide(proxy),
+          Layer.provide(HttpServer.layerServices),
+        ),
+      ),
+    };
+  }).pipe(Effect.provide(UserNotesLive)),
+) {}

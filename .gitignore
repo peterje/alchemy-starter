@@ -2,6 +2,7 @@ node_modules/
 dist/
 .output/
 .alchemy/
+.tanstack/
 .env
 .env.*
 !.env.example

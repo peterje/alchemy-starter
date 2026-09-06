@@ -1,6 +1,6 @@
 # Alchemy starter
 
-A small notes demo with **Effect, Alchemy, and React**. Each user gets a Durable Object with its own SQLite database. No ORM, repository adapters, or mock storage.
+A small notes demo with **Effect, Alchemy, and TanStack Start**. Each user gets a Durable Object with its own SQLite database. No ORM, repository adapters, or mock storage.
 
 The UI switches between Alice and Bob, creates notes, edits them, and deletes them. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes each user's query after mutations.
 
@@ -10,7 +10,7 @@ The UI switches between Alice and Bob, creates notes, edits them, and deletes th
 
 ```bash
 bun install
-bun run dev                 # http://localhost:1337; PORT overrides the local port
+bun run dev                 # UI and /api at http://localhost:1337
 bun run check               # formatting, lint, types, tooling tests, build
 bun run test:integration     # deploy the stack to local workerd, test HTTP, destroy
 bun run test:browser         # exercise the UI on a separate local stage and port
@@ -21,15 +21,24 @@ Local Alchemy runs still need Cloudflare credentials for account/state resolutio
 
 ## Read the example
 
-| File                         | Purpose                                                              |
-| ---------------------------- | -------------------------------------------------------------------- |
-| `alchemy.run.ts`             | Provision one Vite Worker and its SQLite-backed DO namespace         |
-| `apps/website/src/notes.ts`  | Shared schemas, branded IDs, errors, and HttpApi contract            |
-| `apps/website/src/worker.ts` | Worker routing, DO initialization, SQL migrations, and CRUD handlers |
-| `apps/website/src/main.tsx`  | React UI and Effect Atom queries/mutations                           |
-| `test/notes.test.ts`         | Integration tests against actual Workers and Durable Objects         |
+| File                                 | Purpose                                                              |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| `alchemy.run.ts`                     | Deploy the Effect-native API Worker and TanStack Start website       |
+| `apps/website/src/notes.ts`          | Shared schemas, branded IDs, errors, and HttpApi contract            |
+| `apps/website/src/worker.ts`         | Worker routing, DO initialization, SQL migrations, and CRUD handlers |
+| `apps/website/src/routes/index.tsx`  | React UI and Effect Atom queries/mutations                           |
+| `apps/website/src/routes/__root.tsx` | TanStack Start document                                              |
+| `apps/website/src/routes/api.$.ts`   | Same-origin API route forwarding through an Alchemy service binding  |
+| `apps/website/src/router.tsx`        | Original TanStack router and typed route tree                        |
+| `test/notes.test.ts`                 | Integration tests against actual Workers and Durable Objects         |
 
-The contract stays separate so the browser never imports Worker code. The native platform classes in `worker.ts` are thin HTTP entry points; Effect `HttpApiBuilder` handles decoding, handlers, responses, and typed errors. SQL rows are decoded with the same Note schema. Mutations use bound parameters and `RETURNING`, and missing notes produce a typed 404 rather than exposing a cursor over RPC.
+The contract stays separate so the browser never imports Worker code. `Cloudflare.Worker` and `Cloudflare.DurableObject` define the backend runtimes as Effects. The object's inner Effect runs migrations and builds its HttpApi before serving requests; the Worker selects the user's object through Alchemy's typed namespace.
+
+Keep the original TanStack Start flow: SSR, file routes, and same-origin `/api`. `routes/api.$.ts` reads `env.NOTES` and forwards to the Alchemy-defined Worker through a service binding. That framework adapter is the only runtime `cloudflare:workers` import; it defines no resources. The backend has no public workers.dev endpoint, and the browser needs no API URL or CORS configuration.
+
+The original `start.ts`, router, document shell, and typed route tree remain. Effect Atom resolves relative URLs against the current request during SSR and the page origin in the browser.
+
+Effect `HttpApiBuilder` handles validation, responses, and typed errors. SQL rows use the same Note schema. Mutations use bound parameters and `RETURNING`; missing notes produce a typed 404.
 
 The API lives at `/api/users/:userId/notes/`, with `GET`/`POST` for the collection and `GET`/`PUT`/`DELETE` at `/:id`. Lists return the latest 100 notes. Titles are trimmed and limited to 120 characters; bodies are limited to 20,000 characters.
 

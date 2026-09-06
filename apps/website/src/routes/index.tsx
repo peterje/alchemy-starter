@@ -1,20 +1,37 @@
-import { RegistryProvider, useAtom, useAtomValue } from "@effect/atom-react";
+import { useAtom, useAtomSuspense } from "@effect/atom-react";
+import { createFileRoute, useHydrated } from "@tanstack/react-router";
 import { Exit, Result, Schema } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
+import { Suspense } from "react";
 import { AsyncResult, Atom, AtomHttpApi } from "effect/unstable/reactivity";
-import { createRoot } from "react-dom/client";
-import { NoteInput, NotesApi, UserId } from "./notes.ts";
-import "./styles.css";
+import { NoteInput, NotesApi, UserId } from "../notes.ts";
+import { pageOrigin } from "../page-origin.ts";
+
+export const Route = createFileRoute("/")({ ssr: true, component: HomePage });
+
+// workerd requires absolute URLs; resolve against the request origin during SSR.
+function withPageOrigin(client: HttpClient.HttpClient): HttpClient.HttpClient {
+  return HttpClient.mapRequest(client, (request) => {
+    try {
+      new URL(request.url);
+      return request;
+    } catch {
+      return HttpClientRequest.setUrl(request, new URL(request.url, pageOrigin()));
+    }
+  });
+}
 
 const client = AtomHttpApi.Service()("NotesClient", {
   api: NotesApi,
   httpClient: FetchHttpClient.layer,
+  transformClient: withPageOrigin,
 });
 const userAtom = Atom.make(UserId.make("alice"));
 const notesAtom = Atom.family((userId: UserId) =>
   client.query("notes", "list", {
     params: { userId },
     reactivityKeys: [userId],
+    serializationKey: userId,
   }),
 );
 const createAtom = client.mutation("notes", "create");
@@ -22,23 +39,28 @@ const updateAtom = client.mutation("notes", "update");
 const removeAtom = client.mutation("notes", "remove");
 const validationAtom = Atom.make("");
 
+function HomePage() {
+  return (
+    <Suspense fallback={<p role="status">Loading notes…</p>}>
+      <NotesDemo />
+    </Suspense>
+  );
+}
+
 function NotesDemo() {
+  const hydrated = useHydrated();
   const [userId, selectUser] = useAtom(userAtom);
-  const notes = useAtomValue(notesAtom(userId));
+  const notes = useAtomSuspense(notesAtom(userId), { includeFailure: true });
   const [created, create] = useAtom(createAtom, { mode: "promiseExit" });
   const [updated, update] = useAtom(updateAtom, { mode: "promiseExit" });
   const [removed, remove] = useAtom(removeAtom);
   const [validation, setValidation] = useAtom(validationAtom);
-  const busy = [created, updated, removed].some(AsyncResult.isWaiting);
+  // SSR renders the form before React can handle submissions. Wait for hydration before enabling it.
+  const busy = !hydrated || [created, updated, removed].some(AsyncResult.isWaiting);
   const failed = [created, updated, removed].some(AsyncResult.isFailure);
 
   return (
     <>
-      <header>
-        <p className="eyebrow">Alchemy + Effect</p>
-        <h1>Your notes, your object.</h1>
-        <p>One Durable Object and SQLite database per user. No ORM.</p>
-      </header>
       <label className="user-picker">
         Demo user
         <select
@@ -111,9 +133,6 @@ function NotesDemo() {
           <p role="alert" className="error">
             Could not load notes. Reload to try again.
           </p>
-        ) : null}
-        {!AsyncResult.isSuccess(notes) && !AsyncResult.isFailure(notes) ? (
-          <p role="status">Loading notes…</p>
         ) : null}
         {AsyncResult.isSuccess(notes) ? (
           <>
@@ -197,11 +216,3 @@ function NotesDemo() {
     </>
   );
 }
-
-const root = document.getElementById("root");
-if (root)
-  createRoot(root).render(
-    <RegistryProvider>
-      <NotesDemo />
-    </RegistryProvider>,
-  );

@@ -91,7 +91,9 @@ test(
 
     const normalized = yield* HttpClient.post(
       `${websiteUrl}/api/users/notes-test-validation/notes/`,
-      { body: HttpBody.jsonUnsafe({ title: "  Trim me  ", body: "" }) },
+      {
+        body: HttpBody.jsonUnsafe({ title: "  Trim me  ", body: "" }),
+      },
     );
     expect(normalized.status).toBe(200);
     const note = yield* normalized.json.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Note)));
