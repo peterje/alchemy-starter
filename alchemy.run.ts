@@ -1,34 +1,19 @@
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
+import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import type { UserNotes } from "./apps/website/src/worker.ts";
 
-/** Deployable Alchemy stack for the SPA, Effect API, and its D1 state. */
 export default Alchemy.Stack(
   "Starter",
-  {
-    providers: Cloudflare.providers(),
-    state: Cloudflare.state(),
-  },
+  { providers: Cloudflare.providers(), state: Cloudflare.state() },
   Effect.gen(function* () {
-    const todos = yield* Cloudflare.D1.Database("Todos", {
-      migrationsDir: "apps/website/migrations",
-    });
-    const website = yield* Cloudflare.Website.Vite<{ TODOS: typeof todos }>("Website", {
+    const website = yield* Cloudflare.Website.Vite("Website", {
       rootDir: "apps/website",
-      memo: {
-        include: ["**/*"],
-        lockfile: true,
-      },
-      compatibility: {
-        flags: ["nodejs_compat"],
-      },
-      env: {
-        TODOS: todos,
-      },
+      main: "src/worker.ts",
+      dev: { port: yield* Config.number("PORT").pipe(Config.withDefault(1337), Effect.orDie) },
+      env: { NOTES: Cloudflare.DurableObject<UserNotes>("UserNotes") },
     });
-
-    return {
-      websiteUrl: website.url.as<string>(),
-    };
+    return { websiteUrl: website.url.as<string>() };
   }),
 );

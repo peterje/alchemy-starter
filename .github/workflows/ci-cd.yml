@@ -38,7 +38,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # `alchemy dev` emulates the Worker and D1 locally but still resolves
+    # Local workerd tests use real Durable Object SQLite but still resolve
     # Cloudflare credentials and state, so the browser suite needs the secrets.
     env:
       CI: "true"
@@ -55,6 +55,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install Chromium
         run: bunx playwright install --with-deps chromium
+      - name: Run Worker and Durable Object integration suite
+        run: bun run test:integration
       - name: Run browser integration suite
         run: bun run test:browser
       - name: Upload browser diagnostics

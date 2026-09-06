@@ -8,15 +8,14 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: "http://localhost:1337",
+    baseURL: "http://localhost:1341",
     trace: "retain-on-failure",
   },
-  // `alchemy dev` runs the Worker in local workerd with a local D1, so the
-  // suite exercises the same server entry and repository as production.
+  // Use a dedicated stage and port so tests never clear a developer's demo notes.
   webServer: {
-    command: "bun run dev",
-    url: "http://localhost:1337",
-    reuseExistingServer: true,
+    command: "PORT=1341 bun run dev --stage browser-test",
+    url: "http://localhost:1341",
+    reuseExistingServer: false,
     timeout: 180_000,
   },
 });

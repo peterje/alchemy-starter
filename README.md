@@ -1,80 +1,48 @@
 # Alchemy starter
 
-GitHub template for an Effect-native Alchemy + React application:
+A small notes demo with **Effect, Alchemy, and React**. Each user gets a Durable Object with its own SQLite database. No ORM, repository adapters, or mock storage.
 
-- Alchemy 2 on Cloudflare Workers (`bun run dev` / `bun run deploy`)
-- TanStack Start, client-rendered by default, with every backend endpoint under `/api/*`
-- Schema-first Effect `HttpApi` backed by Cloudflare D1
-- Effect `AtomHttpApi` queries and mutations with React Atom bindings
-- No React local state, effect hooks, or TanStack server functions in application code
-- Bun workspaces, TypeScript 7 strictness, conventional commits
-- oxlint **anti-slop** and Effect architecture rules, oxfmt, lefthook
-- Playwright browser integration on `main`
-- React Doctor skill and `bun run doctor`
+The UI switches between Alice and Bob, creates notes, edits them, and deletes them. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes each user's query after mutations.
 
-The demo is a small todo manager. It shows one typed contract flowing from HTTP schemas and handlers through D1 persistence to client query and mutation atoms.
+**This is a public demo, not an authenticated app.** The selected user ID controls routing, not authorization. Before storing private data, authenticate requests and select the Durable Object from the verified session instead of a client-supplied ID.
 
-## Effect end to end
-
-The app keeps one explicit path for state:
-
-```text
-Effect Schema + HttpApi contract
-  → Effect service + Layer handlers
-  → Cloudflare D1 repository
-  → AtomHttpApi generated client
-  → @effect/atom-react hooks
-  → React UI
-```
-
-The domain lives in packages; the app is a thin host. Each package exposes a client-safe contract as its root entry and keeps implementation behind a `/server` entry:
-
-| Package          | `.` (client-safe)                      | `./server`                                       |
-| ---------------- | -------------------------------------- | ------------------------------------------------ |
-| `@starter/todos` | schemas, errors, `TodosApiGroup`       | `TodoRepository` service, `TodoRepositoryD1`     |
-| `@starter/api`   | `StarterApi`: every group under `/api` | `ApiRoutes`: handlers mapping groups to services |
-
-Mutations invalidate the same reactivity key as the todo query, so Atom refreshes server state without `useState`, `useEffect`, or a second client-state library.
-
-TanStack server functions are intentionally banned. Add backend behavior as a group in its domain package, register it in `StarterApi`, then expose it to React through `AtomHttpApi`. `apps/website/src/routes/api.$.ts` is the composition root: it binds D1 from `cloudflare:workers` and hands every request under `/api` to `ApiRoutes`.
-
-Three checks keep implementation out of the browser. Package `exports` make `/server` the only path to it. A Vite plugin fails the client build if any `@starter/*/server`, `@starter/*/testing`, or `cloudflare:workers` import reaches the client graph. `tools/workspace-boundaries.test.ts` allows `/server` imports only from the composition root, which also covers loaders, since those run on both sides.
-
-Routes are client-rendered by default (`defaultSsr: false` in `src/start.ts`), so the Worker only renders the document shell. A route can opt into SSR with `ssr: true` if it ever needs it.
-
-- [Effect Atom](https://www.effect.website/docs/v4/api/effect/unstable/reactivity/Atom)
-- [Effect AtomHttpApi](https://www.effect.website/docs/v4/api/effect/unstable/reactivity/AtomHttpApi)
-
-## Commands
+## Run
 
 ```bash
 bun install
-bun run dev          # Alchemy dev server at http://localhost:1337
-bun run check        # format, lint, types, tests, plugin tests, build
-bun run test:browser # Playwright against `alchemy dev` (local workerd + D1)
-bun run doctor       # React Doctor on the changed scope
-bun run deploy       # production Worker and D1 database
+bun run dev                 # http://localhost:1337; PORT overrides the local port
+bun run check               # formatting, lint, types, tooling tests, build
+bun run test:integration     # deploy the stack to local workerd, test HTTP, destroy
+bun run test:browser         # exercise the UI on a separate local stage and port
+bun run deploy              # deploy to Cloudflare
 ```
 
-`alchemy dev` runs the Worker in local workerd with a local D1 database, so development and the browser suite exercise the same routes and D1 repository as production. The API unit test swaps in an in-memory repository Layer; nothing else knows it exists.
+Local Alchemy runs still need Cloudflare credentials for account/state resolution. Copy `.env.example` and supply your account ID and API token, or use Alchemy's Cloudflare login.
 
-Provision GitHub Actions Cloudflare secrets and enable production deploys once:
+## Read the example
 
-```bash
-bun run ci:provision
-```
+| File                         | Purpose                                                              |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `alchemy.run.ts`             | Provision one Vite Worker and its SQLite-backed DO namespace         |
+| `apps/website/src/notes.ts`  | Shared schemas, branded IDs, errors, and HttpApi contract            |
+| `apps/website/src/worker.ts` | Worker routing, DO initialization, SQL migrations, and CRUD handlers |
+| `apps/website/src/main.tsx`  | React UI and Effect Atom queries/mutations                           |
+| `test/notes.test.ts`         | Integration tests against actual Workers and Durable Objects         |
 
-## Layout
+The contract stays separate so the browser never imports Worker code. The native platform classes in `worker.ts` are thin HTTP entry points; Effect `HttpApiBuilder` handles decoding, handlers, responses, and typed errors. SQL rows are decoded with the same Note schema. Mutations use bound parameters and `RETURNING`, and missing notes produce a typed 404 rather than exposing a cursor over RPC.
 
-```text
-packages/todos                todo domain: contract, repository service, D1 adapter
-packages/api                  the HttpApi: groups under /api, handlers, API test
-apps/website/src/routes/api.$.ts  composition root: D1 binding into ApiRoutes
-apps/website/src/todos/atoms.ts   AtomHttpApi client over the contract
-apps/website/src/start.ts     TanStack Start instance, client-rendered by default
-apps/website/migrations       D1 schema
-apps/website/test/browser     end-to-end AtomHttpApi CRUD coverage
-packages/oxlint-plugins       shared TypeScript, Effect, and React architecture rules
-stacks/github.ts              CI credential bootstrap
-.github/workflows             verify → browser → deploy
-```
+The API lives at `/api/users/:userId/notes/`, with `GET`/`POST` for the collection and `GET`/`PUT`/`DELETE` at `/:id`. Lists return the latest 100 notes. Titles are trimmed and limited to 120 characters; bodies are limited to 20,000 characters.
+
+## Change the schema
+
+Append SQL to `migrations` in `worker.ts`. Each object applies pending migrations on its first request after activation. Every migration and its history row run in `storage.transactionSync`, so a failed migration rolls back and is retried on the next activation. Never edit or remove a migration that has shipped.
+
+Alchemy handles **DO class migrations** at deploy time. These are separate from the **per-instance SQL migrations** above. Deploying code does not eagerly migrate every user's database.
+
+See [Alchemy's integration testing tutorial](https://alchemy.run/cloudflare/tutorial/part-3/) for the `Test.make` → `beforeAll(deploy(Stack))` → HTTP assertions → `afterAll(destroy(Stack))` pattern. These tests use `dev: true` for actual local workerd SQLite, not a fake database. Browser tests also cover user isolation, reloads, and preserving drafts after failed writes.
+
+## Tooling
+
+The template keeps TypeScript strictness, Effect/React architecture lint rules, oxfmt, commit hooks, Playwright, and GitHub Actions. The browser build rejects server-only imports. No React `useState`/`useEffect` or additional client state library is needed.
+
+Provision CI credentials with `bun run ci:provision`. Production deploys remain gated by the repository's `CLOUDFLARE_DEPLOY_ENABLED` variable.

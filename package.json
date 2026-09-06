@@ -18,10 +18,11 @@
     "prepare": "lefthook install",
     "lint": "bun --bun oxlint .",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test tools",
+    "test:integration": "bun test test/notes.test.ts",
     "test:plugins": "node --experimental-strip-types --test packages/oxlint-plugins/*.rule.ts",
     "test:browser": "playwright test",
-    "check": "bun run format:check && bun run lint && bun run typecheck && bun test && bun run test:plugins && bun run build",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run test:plugins && bun run build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "doctor": "npx react-doctor@latest --verbose --scope changed"
