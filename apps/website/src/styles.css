@@ -53,13 +53,11 @@ label {
   font-weight: 600;
 }
 input,
-textarea,
 select,
 button {
   font: inherit;
 }
 input,
-textarea,
 select {
   min-width: 0;
   padding: 0.65rem;
@@ -67,9 +65,6 @@ select {
   border-radius: 0.35rem;
   background: white;
   color: inherit;
-}
-textarea {
-  resize: vertical;
 }
 button {
   justify-self: start;

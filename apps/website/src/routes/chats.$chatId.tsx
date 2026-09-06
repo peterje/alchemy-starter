@@ -1,10 +1,11 @@
 import { useAtom, useAtomSuspense, useAtomValue } from "@effect/atom-react";
+import { ChatId, MessageInput, messageListLimit } from "@starter/contract/chats";
 import { createFileRoute, useHydrated } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { Suspense } from "react";
+
 import { client, userAtom } from "../atoms.ts";
-import { ChatId, MessageInput, messageListLimit } from "@starter/contract/chats";
 
 export const Route = createFileRoute("/chats/$chatId")({
   // A malformed ID fails here, and the route renders ChatUnavailable instead of the page.
@@ -44,6 +45,7 @@ function Room({ chatId }: Readonly<{ chatId: ChatId }>) {
 
   if (AsyncResult.isFailure(chat) || AsyncResult.isFailure(messages)) return <ChatUnavailable />;
   const member = chat.value.members.includes(userId);
+  // The key discards a draft when the user changes, since the author is part of the message.
   return (
     <section key={`${chatId}/${userId}`} aria-label={chat.value.title}>
       <h2>{chat.value.title}</h2>
@@ -51,7 +53,7 @@ function Room({ chatId }: Readonly<{ chatId: ChatId }>) {
         Members: {chat.value.members.join(", ")} · showing the latest {messageListLimit} messages
       </p>
       {messages.value.length === 0 ? <p className="empty">No messages yet.</p> : null}
-      <ol className="messages" aria-label="Messages">
+      <ol aria-label="Messages">
         {messages.value.map((message) => (
           <li key={message.id}>
             <strong>{message.author}</strong> {message.body}

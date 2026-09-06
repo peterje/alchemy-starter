@@ -1,5 +1,4 @@
 import { defineRule } from "@oxlint/plugins";
-
 import type { ESTree } from "@oxlint/plugins";
 
 import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts";

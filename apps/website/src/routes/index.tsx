@@ -1,11 +1,12 @@
 import { useAtom, useAtomSuspense, useAtomValue } from "@effect/atom-react";
+import { ChatInput } from "@starter/contract/chats";
+import type { UserId } from "@starter/contract/user";
 import { Link, createFileRoute, useHydrated, useNavigate } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { Suspense } from "react";
+
 import { client, userAtom } from "../atoms.ts";
-import { ChatInput } from "@starter/contract/chats";
-import type { UserId } from "@starter/contract/user";
 
 export const Route = createFileRoute("/")({ component: MembershipsPage });
 

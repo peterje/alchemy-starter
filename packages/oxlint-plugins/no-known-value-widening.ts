@@ -1,4 +1,5 @@
 import { defineRule } from "@oxlint/plugins";
+import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
 import {
   classifyWideningTarget,
@@ -7,8 +8,6 @@ import {
   type TypeEnvironment,
   type WideningTarget,
 } from "./dictionary-types.ts";
-
-import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
 type FunctionExpression = ESTree.ArrowFunctionExpression | ESTree.Function;
 

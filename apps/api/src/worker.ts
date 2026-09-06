@@ -1,8 +1,9 @@
+import { ChatId } from "@starter/contract/chats";
+import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Config, Effect, Schema } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
-import { ChatId } from "@starter/contract/chats";
-import { UserId } from "@starter/contract/user";
+
 import ChatRoom from "./chat-room.ts";
 import UserStore from "./user-store.ts";
 

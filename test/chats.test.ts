@@ -1,12 +1,14 @@
-import * as Cloudflare from "alchemy/Cloudflare";
-import * as Test from "alchemy/Test/Bun";
 import { expect } from "bun:test";
-import { Effect, Result, Schema } from "effect";
-import { HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http";
-import { HttpApiClient } from "effect/unstable/httpapi";
+
 import { Api } from "@starter/contract/api";
 import { ChatId, Membership, Message } from "@starter/contract/chats";
 import { UserId } from "@starter/contract/user";
+import * as Cloudflare from "alchemy/Cloudflare";
+import * as Test from "alchemy/Test/Bun";
+import { Effect, Result, Schema } from "effect";
+import { HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http";
+import { HttpApiClient } from "effect/unstable/httpapi";
+
 import Stack from "../alchemy.run.ts";
 
 // Deploy the real stack into local workerd, including actual Durable Object SQLite databases.

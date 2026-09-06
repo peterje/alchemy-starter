@@ -1,10 +1,7 @@
-import * as Cloudflare from "alchemy/Cloudflare";
-import { Clock, Effect, Layer, Option, Schema } from "effect";
-import { HttpRouter, HttpServer } from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { ChatApi } from "@starter/contract/api";
 import {
   ChatId,
+  ChatInput,
   ChatNotFound,
   Message,
   MessageId,
@@ -12,6 +9,11 @@ import {
   NotAMember,
 } from "@starter/contract/chats";
 import { UserId } from "@starter/contract/user";
+import * as Cloudflare from "alchemy/Cloudflare";
+import { Array, Clock, Effect, Layer, Option, Schema } from "effect";
+import { HttpRouter, HttpServer } from "effect/unstable/http";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+
 import { openDatabase } from "./database.ts";
 
 // Append only: each chat's database runs the statements past its stored version on its next activation.
@@ -26,7 +28,7 @@ const chatMigrations = [
   )`,
   "CREATE INDEX messages_created_at ON messages (created_at ASC, id ASC)",
 ];
-const ChatRow = Schema.Struct({ id: ChatId, title: Schema.String, createdAt: Schema.Natural });
+const ChatRow = Schema.Struct({ id: ChatId, ...ChatInput.fields, createdAt: Schema.Natural });
 const MemberRow = Schema.Struct({ userId: UserId, joinedAt: Schema.Natural });
 
 /**
@@ -77,11 +79,9 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
           messages: () =>
             query(
               Schema.Array(Message),
-              `SELECT id, author, body, createdAt FROM (
-                 SELECT id, author, body, created_at AS createdAt FROM messages
-                 ORDER BY created_at DESC, id DESC LIMIT ${messageListLimit}
-               ) ORDER BY createdAt ASC, id ASC`,
-            ),
+              `SELECT id, author, body, created_at AS createdAt FROM messages
+               ORDER BY created_at DESC, id DESC LIMIT ${messageListLimit}`,
+            ).pipe(Effect.map(Array.reverse)),
           post: ({ params, payload }) =>
             Effect.gen(function* () {
               yield* queryFirst(

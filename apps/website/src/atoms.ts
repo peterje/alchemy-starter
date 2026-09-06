@@ -1,15 +1,14 @@
+import { Api } from "@starter/contract/api";
+import { UserId } from "@starter/contract/user";
+// Not `client.ts`: TanStack Start would treat that file as the browser entry and skip hydration.
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { Atom, AtomHttpApi } from "effect/unstable/reactivity";
-import { Api } from "@starter/contract/api";
-import { UserId } from "@starter/contract/user";
 
 const pageOrigin = createIsomorphicFn()
   .client(() => globalThis.location.origin)
   .server(() => getRequestUrl().origin);
-
-// Not `client.ts`: TanStack Start would treat that file as the browser entry and skip hydration.
 
 /** One client for every API group. Routes query and mutate through its atoms. */
 export const client = AtomHttpApi.Service()("ApiClient", {

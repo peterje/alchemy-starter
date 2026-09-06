@@ -1,9 +1,10 @@
+import { UserApi } from "@starter/contract/api";
+import { ChatId, ChatNotFound, Membership } from "@starter/contract/chats";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { UserApi } from "@starter/contract/api";
-import { ChatId, ChatNotFound, Membership } from "@starter/contract/chats";
+
 import ChatRoom from "./chat-room.ts";
 import { openDatabase } from "./database.ts";
 

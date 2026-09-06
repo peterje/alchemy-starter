@@ -1,4 +1,5 @@
 import { RegistryProvider, useAtom } from "@effect/atom-react";
+import { UserId } from "@starter/contract/user";
 import {
   HeadContent,
   Link,
@@ -8,8 +9,9 @@ import {
   useHydrated,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
 import { userAtom } from "../atoms.ts";
-import { UserId } from "@starter/contract/user";
+
 import "../styles.css";
 
 /** Root document route for the starter demo. */
@@ -67,12 +69,12 @@ function Document({ children }: Readonly<{ children: ReactNode }>) {
         <HeadContent />
       </head>
       <body>
-        <main className="demo-app">
+        <main>
           <p className="eyebrow">
             <Link to="/">Alchemy + Effect starter</Link>
           </p>
           <h1>Every chat is an object.</h1>
-          <p className="lede">
+          <p>
             Each chat is a Durable Object with its own SQLite database: one writer for its members
             and messages. Each user's object indexes the chats they belong to. No ORM.
           </p>
