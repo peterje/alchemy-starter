@@ -1,5 +1,5 @@
 import type * as Cloudflare from "alchemy/Cloudflare";
-import { Effect, Schema } from "effect";
+import { Array, Effect, Schema } from "effect";
 
 /**
  * Applies pending migrations, then returns schema-decoded queries over the object's SQLite
@@ -29,6 +29,11 @@ export const openDatabase = (
         Effect.flatMap(Schema.decodeUnknownEffect(rows)),
         Effect.orDie,
       );
+    const queryFirst = <Row, RD>(
+      row: Schema.ConstraintDecoder<Row, RD>,
+      statement: string,
+      ...bindings: ReadonlyArray<string | number>
+    ) => Effect.map(query(Schema.Array(row), statement, ...bindings), Array.head);
     /** For statements that return exactly one row, such as `INSERT ... RETURNING`. */
     const queryOne = <Row, RD>(
       row: Schema.ConstraintDecoder<Row, RD>,
@@ -40,5 +45,5 @@ export const openDatabase = (
         Effect.flatMap(Schema.decodeUnknownEffect(row)),
         Effect.orDie,
       );
-    return { query, queryOne };
+    return { query, queryFirst, queryOne };
   });
