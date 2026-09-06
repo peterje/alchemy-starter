@@ -140,7 +140,7 @@ test(
       posted.map((message) => message.id).sort(),
     );
     expect(messages.map((message) => message.createdAt)).toEqual(
-      [...messages.map((message) => message.createdAt)].sort((a, b) => a - b),
+      messages.map((message) => message.createdAt).sort((a, b) => a - b),
     );
   }),
   { timeout: 120_000 },
