@@ -4,7 +4,7 @@ This repository is a template. Every file is an example future code will copy, s
 
 ## Architecture
 
-- `apps/website/src/store.ts`, `chats.ts`, and `api.ts` are the contract. The browser imports them, so they must never import `alchemy`, `cloudflare:workers`, or `worker.ts`. The Vite build fails if they do.
+- `apps/website/src/user.ts`, `chats.ts`, and `api.ts` are the contract. The browser imports them, so they must never import `alchemy`, `cloudflare:workers`, or `worker.ts`. The Vite build fails if they do.
 - A feature is one contract module with its `HttpApiGroup`s, registered in `api.ts` under the object that serves them, plus a handlers block in that object in `worker.ts` and a route under `routes/`.
 - Objects are the consistency boundary. Put state that must be read and written together in one object. Cross-object writes go through typed RPC methods that return plain values and are idempotent.
 - `atoms.ts` holds the single AtomHttpApi client and the demo user atom. Routes read them; they do not create their own.

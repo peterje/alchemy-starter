@@ -1,9 +1,7 @@
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as GitHub from "alchemy/GitHub";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
+import { Effect, Layer, Redacted } from "effect";
 
 // Point these at your fork before running `bun run ci:provision`.
 const GITHUB_OWNER = "peterje";

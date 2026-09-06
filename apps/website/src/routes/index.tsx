@@ -1,21 +1,19 @@
 import { useAtom, useAtomSuspense, useAtomValue } from "@effect/atom-react";
 import { Link, createFileRoute, useHydrated, useNavigate } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { Suspense } from "react";
 import { client, userAtom } from "../atoms.ts";
 import { ChatInput } from "../chats.ts";
-import type { UserId } from "../store.ts";
+import type { UserId } from "../user.ts";
 
 export const Route = createFileRoute("/")({ component: MembershipsPage });
 
-const membershipsAtom = Atom.family((userId: UserId) =>
+const membershipsAtom = (userId: UserId) =>
   client.query("memberships", "list", {
     params: { userId },
-    reactivityKeys: [userId],
-    serializationKey: userId,
-  }),
-);
+    reactivityKeys: { memberships: [userId] },
+  });
 const createAtom = client.mutation("memberships", "create");
 
 function MembershipsPage() {
@@ -44,7 +42,11 @@ function Memberships() {
           const payload = Schema.decodeUnknownSync(ChatInput)(
             Object.fromEntries(new FormData(event.currentTarget)),
           );
-          const result = await create({ params: { userId }, payload, reactivityKeys: [userId] });
+          const result = await create({
+            params: { userId },
+            payload,
+            reactivityKeys: { memberships: [userId] },
+          });
           if (Exit.isSuccess(result)) {
             await navigate({ to: "/chats/$chatId", params: { chatId: result.value.chatId } });
           }

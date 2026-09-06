@@ -24,7 +24,7 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | File                                        | Purpose                                                              |
 | ------------------------------------------- | -------------------------------------------------------------------- |
 | `alchemy.run.ts`                            | Deploy the Effect-native API Worker and TanStack Start website       |
-| `apps/website/src/store.ts`                 | The user ID that selects an object, and the storage error            |
+| `apps/website/src/user.ts`                  | The user ID that selects an object                                   |
 | `apps/website/src/chats.ts`                 | The chats feature: schemas, branded IDs, errors, and two API groups  |
 | `apps/website/src/api.ts`                   | Which object serves which group, and the union the browser sees      |
 | `apps/website/src/database.ts`              | Migrations plus schema-decoded queries over an object's SQLite       |

@@ -1,8 +1,8 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
-import { StorageError, UserId } from "./store.ts";
+import { UserId } from "./user.ts";
 
-const Timestamp = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const Timestamp = Schema.Natural;
 
 export const ChatId = Schema.String.check(Schema.isUUID()).pipe(Schema.brand("ChatId"));
 export type ChatId = typeof ChatId.Type;
@@ -66,18 +66,16 @@ export class MembershipsGroup extends HttpApiGroup.make("memberships")
     HttpApiEndpoint.get("list", "/", {
       params: { userId: UserId },
       success: Schema.Array(Membership),
-      error: StorageError,
     }),
     HttpApiEndpoint.post("create", "/", {
       params: { userId: UserId },
       payload: ChatInput,
       success: Membership,
-      error: StorageError,
     }),
     HttpApiEndpoint.post("join", "/:chatId", {
       params: { userId: UserId, chatId: ChatId },
       success: Membership,
-      error: [ChatNotFound, StorageError],
+      error: ChatNotFound,
     }),
   )
   .prefix("/users/:userId/chats") {}
@@ -88,18 +86,17 @@ export class ChatGroup extends HttpApiGroup.make("chat")
     HttpApiEndpoint.get("get", "/", {
       params: { chatId: ChatId },
       success: Chat,
-      error: [ChatNotFound, StorageError],
+      error: ChatNotFound,
     }),
     HttpApiEndpoint.get("messages", "/messages", {
       params: { chatId: ChatId },
       success: Schema.Array(Message),
-      error: StorageError,
     }),
     HttpApiEndpoint.post("post", "/messages", {
       params: { chatId: ChatId },
       payload: MessageInput,
       success: Message,
-      error: [NotAMember, StorageError],
+      error: NotAMember,
     }),
   )
   .prefix("/chats/:chatId") {}

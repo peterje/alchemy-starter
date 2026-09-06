@@ -5,10 +5,3 @@ export const UserId = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,128
   Schema.brand("UserId"),
 );
 export type UserId = typeof UserId.Type;
-
-/** Internal details are logged at the storage boundary, not sent to clients. */
-export class StorageError extends Schema.TaggedError<StorageError>()(
-  "StorageError",
-  {},
-  { httpApiStatus: 500 },
-) {}

@@ -20,8 +20,10 @@ const serverOnlyGuard: Plugin = {
   name: "starter:server-only-guard",
   enforce: "pre",
   resolveId(source, importer) {
-    if (this.environment.name !== "client" || !serverOnlySpecifier.test(source)) {
-      return null;
+    if (!serverOnlySpecifier.test(source)) return null;
+    // The Workers runtime provides this module; the standalone build has no plugin to say so.
+    if (this.environment.name !== "client") {
+      return source === "cloudflare:workers" ? { id: source, external: true } : null;
     }
     if (this.environment.config.command === "serve") {
       return `${serverOnlyStubPrefix}${source}`;
@@ -38,9 +40,4 @@ const serverOnlyGuard: Plugin = {
 /** Vite and TanStack Start build configuration for the Cloudflare website. */
 export default defineConfig({
   plugins: [serverOnlyGuard, tanstackStart(), viteReact()],
-  build: {
-    rollupOptions: {
-      external: ["cloudflare:workers"],
-    },
-  },
 });

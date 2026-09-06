@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { userAtom } from "../atoms.ts";
-import { UserId } from "../store.ts";
+import { UserId } from "../user.ts";
 import "../styles.css";
 
 /** Root document route for the starter demo. */
@@ -28,8 +28,9 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  // The provider does not inherit the package default, which sweeps unused atoms after 400ms.
   return (
-    <RegistryProvider>
+    <RegistryProvider defaultIdleTTL={400}>
       <UserPicker />
       <Outlet />
     </RegistryProvider>

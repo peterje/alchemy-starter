@@ -1,38 +1,44 @@
+import type * as Cloudflare from "alchemy/Cloudflare";
 import { Effect, Schema } from "effect";
-import { StorageError } from "./store.ts";
 
 /**
- * Applies pending migrations to a Durable Object's SQLite database, then
- * returns schema-decoded query helpers over it. Schema and version commit
- * together, so a failed migration rolls back and is retried on the next activation.
+ * Applies pending migrations, then returns schema-decoded queries over the object's SQLite
+ * database. Storage failures are defects: the Worker's HTTP boundary logs them and answers 500.
  */
-export const openDatabase = (storage: DurableObjectStorage, migrations: ReadonlyArray<string>) =>
+export const openDatabase = (
+  state: typeof Cloudflare.DurableObjectState.Service,
+  migrations: ReadonlyArray<string>,
+) =>
   Effect.sync(() => {
+    // Schema and version commit together, so a failed migration rolls back and is retried on
+    // the next activation. transactionSync has no Effect wrapper, so this block uses raw storage.
+    const storage = state.raw.storage;
     storage.transactionSync(() => {
       const version = Schema.decodeUnknownSync(Schema.Number)(storage.kv.get("schemaVersion") ?? 0);
       for (const sql of migrations.slice(version)) storage.sql.exec(sql);
       storage.kv.put("schemaVersion", migrations.length);
     });
 
-    const query = <Rows extends Schema.Top>(
-      rows: Rows,
+    const query = <Row, RD>(
+      rows: Schema.ConstraintDecoder<ReadonlyArray<Row>, RD>,
       statement: string,
       ...bindings: ReadonlyArray<string | number>
     ) =>
-      Effect.try(() => storage.sql.exec(statement, ...bindings).toArray()).pipe(
+      state.storage.sql.exec(statement, ...bindings).pipe(
+        Effect.flatMap((cursor) => cursor.toArray()),
         Effect.flatMap(Schema.decodeUnknownEffect(rows)),
-        Effect.tapError(Effect.logError),
-        Effect.mapError(() => new StorageError()),
+        Effect.orDie,
       );
-    const queryOne = <Row extends Schema.Top, E>(
-      row: Row,
-      onEmpty: () => E,
+    /** For statements that return exactly one row, such as `INSERT ... RETURNING`. */
+    const queryOne = <Row, RD>(
+      row: Schema.ConstraintDecoder<Row, RD>,
       statement: string,
       ...bindings: ReadonlyArray<string | number>
     ) =>
-      Effect.flatMap(query(Schema.Array(row), statement, ...bindings), (rows) => {
-        const first = rows[0];
-        return first === undefined ? Effect.fail(onEmpty()) : Effect.succeed(first);
-      });
+      state.storage.sql.exec(statement, ...bindings).pipe(
+        Effect.flatMap((cursor) => cursor.one()),
+        Effect.flatMap(Schema.decodeUnknownEffect(row)),
+        Effect.orDie,
+      );
     return { query, queryOne };
   });

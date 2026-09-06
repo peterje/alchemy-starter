@@ -3,7 +3,7 @@ import { getRequestUrl } from "@tanstack/react-start/server";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { Atom, AtomHttpApi } from "effect/unstable/reactivity";
 import { Api } from "./api.ts";
-import { UserId } from "./store.ts";
+import { UserId } from "./user.ts";
 
 const pageOrigin = createIsomorphicFn()
   .client(() => globalThis.location.origin)

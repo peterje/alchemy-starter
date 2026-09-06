@@ -1,33 +1,25 @@
 import { useAtom, useAtomSuspense, useAtomValue } from "@effect/atom-react";
 import { createFileRoute, useHydrated } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { Suspense } from "react";
 import { client, userAtom } from "../atoms.ts";
 import { ChatId, MessageInput, messageListLimit } from "../chats.ts";
 
 export const Route = createFileRoute("/chats/$chatId")({
+  // A malformed ID fails here, and the route renders ChatUnavailable instead of the page.
   params: {
     parse: ({ chatId }) => ({ chatId: Schema.decodeUnknownSync(ChatId)(chatId) }),
     stringify: ({ chatId }) => ({ chatId }),
   },
+  errorComponent: ChatUnavailable,
   component: ChatPage,
 });
 
-const chatAtom = Atom.family((chatId: ChatId) =>
-  client.query("chat", "get", {
-    params: { chatId },
-    reactivityKeys: [chatId],
-    serializationKey: chatId,
-  }),
-);
-const messagesAtom = Atom.family((chatId: ChatId) =>
-  client.query("chat", "messages", {
-    params: { chatId },
-    reactivityKeys: [chatId],
-    serializationKey: `${chatId}/messages`,
-  }),
-);
+const chatAtom = (chatId: ChatId) =>
+  client.query("chat", "get", { params: { chatId }, reactivityKeys: { chat: [chatId] } });
+const messagesAtom = (chatId: ChatId) =>
+  client.query("chat", "messages", { params: { chatId }, reactivityKeys: { messages: [chatId] } });
 const joinAtom = client.mutation("memberships", "join");
 const postAtom = client.mutation("chat", "post");
 
@@ -50,13 +42,7 @@ function Room({ chatId }: Readonly<{ chatId: ChatId }>) {
   const busy = !hydrated || AsyncResult.isWaiting(joined) || AsyncResult.isWaiting(posted);
   const failed = AsyncResult.isFailure(joined) || AsyncResult.isFailure(posted);
 
-  if (AsyncResult.isFailure(chat) || AsyncResult.isFailure(messages)) {
-    return (
-      <p role="alert" className="error">
-        Could not load this chat. Check the URL or reload to try again.
-      </p>
-    );
-  }
+  if (AsyncResult.isFailure(chat) || AsyncResult.isFailure(messages)) return <ChatUnavailable />;
   const member = chat.value.members.includes(userId);
   return (
     <section key={`${chatId}/${userId}`} aria-label={chat.value.title}>
@@ -82,7 +68,11 @@ function Room({ chatId }: Readonly<{ chatId: ChatId }>) {
               ...Object.fromEntries(new FormData(form)),
               author: userId,
             });
-            const result = await post({ params: { chatId }, payload, reactivityKeys: [chatId] });
+            const result = await post({
+              params: { chatId },
+              payload,
+              reactivityKeys: { messages: [chatId] },
+            });
             if (Exit.isSuccess(result)) form.reset();
           }}
         >
@@ -104,7 +94,12 @@ function Room({ chatId }: Readonly<{ chatId: ChatId }>) {
         <button
           type="button"
           disabled={busy}
-          onClick={() => join({ params: { userId, chatId }, reactivityKeys: [userId, chatId] })}
+          onClick={() =>
+            join({
+              params: { userId, chatId },
+              reactivityKeys: { memberships: [userId], chat: [chatId] },
+            })
+          }
         >
           Join as {userId}
         </button>
@@ -115,5 +110,13 @@ function Room({ chatId }: Readonly<{ chatId: ChatId }>) {
         </p>
       ) : null}
     </section>
+  );
+}
+
+function ChatUnavailable() {
+  return (
+    <p role="alert" className="error">
+      Could not load this chat. Check the URL or reload to try again.
+    </p>
   );
 }

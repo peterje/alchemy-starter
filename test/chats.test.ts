@@ -2,11 +2,11 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import * as Test from "alchemy/Test/Bun";
 import { expect } from "bun:test";
 import { Effect, Result, Schema } from "effect";
-import { HttpBody, HttpClient } from "effect/unstable/http";
+import { HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
 import { Api } from "../apps/website/src/api.ts";
 import { ChatId, Membership, Message } from "../apps/website/src/chats.ts";
-import { UserId } from "../apps/website/src/store.ts";
+import { UserId } from "../apps/website/src/user.ts";
 import Stack from "../alchemy.run.ts";
 
 // Deploy the real stack into local workerd, including actual Durable Object SQLite databases.
@@ -127,9 +127,8 @@ test(
         }).pipe(
           Effect.flatMap((response) => {
             expect(response.status).toBe(200);
-            return response.json;
+            return HttpClientResponse.schemaBodyJson(Message)(response);
           }),
-          Effect.flatMap(Schema.decodeUnknownEffect(Message)),
         ),
       ),
       { concurrency: 5 },
