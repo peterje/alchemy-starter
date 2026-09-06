@@ -10,7 +10,7 @@ import { noReflectGetRule } from "./no-reflect-get.ts";
 import { noRuntimeTypeofRule } from "./no-runtime-typeof.ts";
 import { noServerFunctionsRule } from "./no-server-functions.ts";
 import { noServiceConstructorImportsRule } from "./no-service-constructor-imports.ts";
-import { noForbiddenTermInSymbolNamesRule } from "./no-shape-in-symbol-names.ts";
+import { noShapeInSymbolNamesRule } from "./no-shape-in-symbol-names.ts";
 import { noUnknownParametersRule } from "./no-unknown-parameters.ts";
 import { noUnknownReturnsRule } from "./no-unknown-returns.ts";
 import { noUnknownTypeAliasesRule } from "./no-unknown-type-aliases.ts";
@@ -34,7 +34,7 @@ const workspacePlugin = eslintCompatPlugin({
     "no-runtime-typeof": noRuntimeTypeofRule,
     "no-server-functions": noServerFunctionsRule,
     "no-service-constructor-imports": noServiceConstructorImportsRule,
-    "no-shape-in-symbol-names": noForbiddenTermInSymbolNamesRule,
+    "no-shape-in-symbol-names": noShapeInSymbolNamesRule,
     "no-unknown-parameters": noUnknownParametersRule,
     "no-unknown-returns": noUnknownReturnsRule,
     "no-unknown-type-aliases": noUnknownTypeAliasesRule,

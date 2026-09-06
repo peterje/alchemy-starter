@@ -1,131 +1,103 @@
 import * as Cloudflare from "alchemy/Cloudflare";
 import type { HttpEffect } from "alchemy/Http";
 import { Clock, Config, Effect, Layer, Schema } from "effect";
-import { HttpRouter, HttpServer, HttpServerRequest } from "effect/unstable/http";
+import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Note, NoteId, NoteNotFound, NoteStorageError, NotesApi, type UserId } from "./notes.ts";
+import { Note, NoteId, NoteNotFound, NoteStorageError, NotesApi, UserId } from "./notes.ts";
 
-// Append only: every user's database applies these on its next activation.
+// Append only: each user's database runs the statements past its stored version on its next activation.
 const migrations = [
-  {
-    id: "0001_notes",
-    sql: `CREATE TABLE notes (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      body TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )`,
-  },
-  {
-    id: "0002_notes_updated_at",
-    sql: "CREATE INDEX notes_updated_at ON notes (updated_at DESC, id ASC)",
-  },
+  `CREATE TABLE notes (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  "CREATE INDEX notes_updated_at ON notes (updated_at DESC, id ASC)",
 ];
 const columns = "id, title, body, created_at AS createdAt, updated_at AS updatedAt";
+const Notes = Schema.Array(Note);
+const NonEmptyNotes = Schema.NonEmptyArray(Note);
 
 /** The outer Effect discovers bindings; the inner Effect initializes each user's instance. */
 export class UserNotes extends Cloudflare.DurableObject<UserNotes, { fetch: HttpEffect }>()(
   "UserNotes",
 ) {}
 
+// The explicit `never` stops TypeScript from inferring DurableObjectState as an extra requirement.
 const UserNotesLive = UserNotes.make<never>(
   Effect.gen(function* () {
     const state = yield* Cloudflare.DurableObjectState;
     return Effect.gen(function* () {
       const storage = state.raw.storage;
-      // No asynchronous work inside transactionSync: schema and history commit together.
-      // A failed initialization must not serve requests against a partial schema.
-      yield* Effect.sync(() => {
-        storage.sql.exec(`CREATE TABLE IF NOT EXISTS __migrations (
-          id TEXT PRIMARY KEY,
-          applied_at INTEGER NOT NULL
-        )`);
-        for (const migration of migrations) {
-          storage.transactionSync(() => {
-            const applied = storage.sql
-              .exec("SELECT id FROM __migrations WHERE id = ?", migration.id)
-              .toArray();
-            if (applied.length > 0) return;
-            storage.sql.exec(migration.sql);
-            storage.sql.exec(
-              "INSERT INTO __migrations (id, applied_at) VALUES (?, ?)",
-              migration.id,
-              Date.now(),
-            );
-          });
-        }
-      });
+      // Schema and version commit together, so a failed migration is retried on the next activation.
+      yield* Effect.sync(() =>
+        storage.transactionSync(() => {
+          const version = Schema.decodeUnknownSync(Schema.Number)(
+            storage.kv.get("schemaVersion") ?? 0,
+          );
+          for (const sql of migrations.slice(version)) storage.sql.exec(sql);
+          storage.kv.put("schemaVersion", migrations.length);
+        }),
+      );
 
-      const query = Effect.fn("Notes.query")(function* (
-        operation: string,
+      const query = <Rows extends Schema.Top>(
+        rows: Rows,
         statement: string,
         ...bindings: ReadonlyArray<string | number>
-      ) {
-        return yield* Effect.try(() => storage.sql.exec(statement, ...bindings).toArray()).pipe(
-          Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(Note))),
+      ) =>
+        Effect.try(() => storage.sql.exec(statement, ...bindings).toArray()).pipe(
+          Effect.flatMap(Schema.decodeUnknownEffect(rows)),
           Effect.tapError(Effect.logError),
-          Effect.mapError(() => new NoteStorageError({ operation })),
+          Effect.mapError(() => new NoteStorageError()),
         );
-      });
-
-      const requireNote = Effect.fn("Notes.requireNote")(function* (
+      const queryNote = (
         id: NoteId,
-        rows: ReadonlyArray<Note>,
-      ) {
-        const note = rows[0];
-        return note === undefined ? yield* Effect.fail(new NoteNotFound({ id })) : note;
-      });
+        statement: string,
+        ...bindings: ReadonlyArray<string | number>
+      ) =>
+        Effect.flatMap(query(Notes, statement, ...bindings), (rows) => {
+          const note = rows[0];
+          return note === undefined ? Effect.fail(new NoteNotFound({ id })) : Effect.succeed(note);
+        });
 
       const handlers = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
         handlers.handleAll({
           // Keep the demo response bounded; introduce pagination for larger histories.
-          list: Effect.fn("Notes.list")(function* () {
-            return yield* query(
-              "list",
-              `SELECT ${columns} FROM notes ORDER BY updated_at DESC, id ASC LIMIT 100`,
-            );
-          }),
-          get: Effect.fn("Notes.get")(function* ({ params }) {
-            return yield* query("get", `SELECT ${columns} FROM notes WHERE id = ?`, params.id).pipe(
-              Effect.flatMap((rows) => requireNote(params.id, rows)),
-            );
-          }),
-          create: Effect.fn("Notes.create")(function* ({ payload }) {
-            const id = yield* Effect.sync(() => NoteId.make(crypto.randomUUID()));
-            const now = yield* Clock.currentTimeMillis;
-            const rows = yield* query(
-              "create",
-              `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${columns}`,
-              id,
-              payload.title,
-              payload.body,
-              now,
-              now,
-            );
-            const note = rows[0];
-            return note === undefined
-              ? yield* Effect.fail(new NoteStorageError({ operation: "create" }))
-              : note;
-          }),
-          update: Effect.fn("Notes.update")(function* ({ params, payload }) {
-            const now = yield* Clock.currentTimeMillis;
-            return yield* query(
-              "update",
-              `UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING ${columns}`,
-              payload.title,
-              payload.body,
-              now,
-              params.id,
-            ).pipe(Effect.flatMap((rows) => requireNote(params.id, rows)));
-          }),
-          remove: Effect.fn("Notes.remove")(function* ({ params }) {
-            return yield* query(
-              "remove",
-              `DELETE FROM notes WHERE id = ? RETURNING ${columns}`,
-              params.id,
-            ).pipe(Effect.flatMap((rows) => requireNote(params.id, rows)));
-          }),
+          list: () =>
+            query(Notes, `SELECT ${columns} FROM notes ORDER BY updated_at DESC, id ASC LIMIT 100`),
+          get: ({ params }) =>
+            queryNote(params.id, `SELECT ${columns} FROM notes WHERE id = ?`, params.id),
+          create: ({ payload }) =>
+            Effect.gen(function* () {
+              const id = yield* Effect.sync(() => NoteId.make(crypto.randomUUID()));
+              const now = yield* Clock.currentTimeMillis;
+              const [note] = yield* query(
+                NonEmptyNotes,
+                `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${columns}`,
+                id,
+                payload.title,
+                payload.body,
+                now,
+                now,
+              );
+              return note;
+            }),
+          update: ({ params, payload }) =>
+            Effect.gen(function* () {
+              const now = yield* Clock.currentTimeMillis;
+              return yield* queryNote(
+                params.id,
+                `UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING ${columns}`,
+                payload.title,
+                payload.body,
+                now,
+                params.id,
+              );
+            }),
+          remove: ({ params }) =>
+            queryNote(params.id, `DELETE FROM notes WHERE id = ? RETURNING ${columns}`, params.id),
         }),
       );
       return {
@@ -151,34 +123,15 @@ export default class NotesWorker extends Cloudflare.Worker<NotesWorker>()(
   }),
   Effect.gen(function* () {
     const notes = yield* UserNotes;
-    const forward = Effect.fn("Notes.forward")(function* (
-      userId: UserId,
-      request: HttpServerRequest.HttpServerRequest,
-    ) {
-      // Demo routing only. Select the object from a verified session before storing private data.
-      return yield* notes
-        .getByName(userId)
-        .fetch(request)
-        .pipe(
-          Effect.tapError(Effect.logError),
-          Effect.mapError(() => new NoteStorageError({ operation: "forward" })),
-        );
-    });
-    const proxy = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
-      handlers
-        .handleRaw("list", ({ params, request }) => forward(params.userId, request))
-        .handleRaw("get", ({ params, request }) => forward(params.userId, request))
-        .handleRaw("create", ({ params, request }) => forward(params.userId, request))
-        .handleRaw("update", ({ params, request }) => forward(params.userId, request))
-        .handleRaw("remove", ({ params, request }) => forward(params.userId, request)),
-    );
-    return {
-      fetch: yield* HttpRouter.toHttpEffect(
-        HttpApiBuilder.layer(NotesApi).pipe(
-          Layer.provide(proxy),
-          Layer.provide(HttpServer.layerServices),
+    // Demo routing only. Select the object from a verified session before storing private data.
+    const forward = HttpRouter.add("*", "/api/users/:userId/*", (request) =>
+      HttpRouter.schemaPathParams(Schema.Struct({ userId: UserId })).pipe(
+        Effect.flatMap(({ userId }) => notes.getByName(userId).fetch(request)),
+        Effect.catchTag("SchemaError", () =>
+          Effect.succeed(HttpServerResponse.empty({ status: 400 })),
         ),
       ),
-    };
+    );
+    return { fetch: yield* HttpRouter.toHttpEffect(forward) };
   }).pipe(Effect.provide(UserNotesLive)),
 ) {}

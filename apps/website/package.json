@@ -3,11 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "build": "vite build && rm -rf .tanstack src/.tanstack",
-    "dev": "vite --host 127.0.0.1 --port 1337",
-    "preview": "vite preview"
-  },
   "dependencies": {
     "@effect/atom-react": "4.0.0-rc.110",
     "@tanstack/react-router": "1.167.4",

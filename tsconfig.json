@@ -1,4 +1,27 @@
 {
-  "extends": "./tsconfig.base.json",
-  "include": ["alchemy.run.ts", "apps/**/*.ts", "apps/**/*.tsx", "stacks/**/*.ts", "test/**/*.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "types": ["bun", "vite/client", "@cloudflare/workers-types"]
+  },
+  "include": [
+    "*.ts",
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "stacks/**/*.ts",
+    "test/**/*.ts"
+  ]
 }

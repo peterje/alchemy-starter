@@ -32,7 +32,7 @@ export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
 /** Internal details are logged at the storage boundary, not sent to clients. */
 export class NoteStorageError extends Schema.TaggedError<NoteStorageError>()(
   "NoteStorageError",
-  { operation: Schema.String },
+  {},
   { httpApiStatus: 500 },
 ) {}
 

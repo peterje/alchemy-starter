@@ -2,7 +2,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
-const serverOnlySpecifier = /^(?:cloudflare:workers|@starter\/[^/]+\/(?:server|testing))$/u;
+const serverOnlySpecifier = /^(?:cloudflare:workers|alchemy(?:\/.*)?)$/u;
 
 const serverOnlyStubPrefix = "\0starter:server-only:";
 
@@ -37,15 +37,7 @@ const serverOnlyGuard: Plugin = {
 
 /** Vite and TanStack Start build configuration for the Cloudflare website. */
 export default defineConfig({
-  plugins: [
-    serverOnlyGuard,
-    tanstackStart({
-      router: {
-        generatedRouteTree: "./.tanstack/routeTree.gen.ts",
-      },
-    }),
-    viteReact(),
-  ],
+  plugins: [serverOnlyGuard, tanstackStart(), viteReact()],
   build: {
     rollupOptions: {
       external: ["cloudflare:workers"],

@@ -15,13 +15,8 @@ export const Route = createRootRoute({
   // The Worker always emits this document. Page chrome lives here so the LCP
   // heading is in the first HTML even when a child route is client-rendered.
   shellComponent: Document,
-  pendingComponent: PendingNotes,
   component: RootComponent,
 });
-
-function PendingNotes() {
-  return <p className="status">Loading notes…</p>;
-}
 
 function RootComponent() {
   return (

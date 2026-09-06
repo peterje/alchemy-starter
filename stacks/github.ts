@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
+// Point these at your fork before running `bun run ci:provision`.
 const GITHUB_OWNER = "peterje";
 const GITHUB_REPOSITORY = "alchemy-starter";
 

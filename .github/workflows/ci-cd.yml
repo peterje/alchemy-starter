@@ -24,7 +24,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.0
+          bun-version-file: package.json
       - name: Install frozen workspace
         run: bun install --frozen-lockfile
       - name: Check formatting, lint, types, tests, and build
@@ -41,7 +41,6 @@ jobs:
     # Local workerd tests use real Durable Object SQLite but still resolve
     # Cloudflare credentials and state, so the browser suite needs the secrets.
     env:
-      CI: "true"
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
@@ -50,7 +49,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.0
+          bun-version-file: package.json
       - name: Install frozen workspace
         run: bun install --frozen-lockfile
       - name: Install Chromium
@@ -82,7 +81,6 @@ jobs:
     environment:
       name: production
     env:
-      CI: "true"
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
@@ -91,7 +89,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.0
+          bun-version-file: package.json
       - name: Install frozen workspace
         run: bun install --frozen-lockfile
       - name: Deploy production stack

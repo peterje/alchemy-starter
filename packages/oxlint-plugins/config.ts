@@ -1,18 +1,6 @@
 export default {
-  ignorePatterns: [
-    ".agent/**",
-    ".agents/**",
-    ".claude/**",
-    ".codex/**",
-    ".continue/**",
-    ".cursor/**",
-    ".gemini/**",
-    ".opencode/**",
-    ".pi/**",
-    ".roo/**",
-    ".windsurf/**",
-    "packages/oxlint-plugins/**",
-  ],
+  // Rule implementations walk untyped ASTs, so they cannot satisfy the rules they define.
+  ignorePatterns: ["**/routeTree.gen.ts", "packages/oxlint-plugins/**"],
   jsPlugins: [
     {
       name: "workspace",
