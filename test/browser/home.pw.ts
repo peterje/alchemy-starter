@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { Schema } from "effect";
-import { Note } from "../../src/notes.ts";
+import { Note } from "../../apps/website/src/notes.ts";
 
 // These two users belong to the public demo. Only clear their notes in the local test app.
 test.beforeEach(async ({ request }) => {

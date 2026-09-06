@@ -1,6 +1,8 @@
-import { RegistryProvider } from "@effect/atom-react";
-import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
+import { RegistryProvider, useAtom } from "@effect/atom-react";
+import { HeadContent, Outlet, Scripts, createRootRoute, useHydrated } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { userAtom } from "../atoms.ts";
+import { UserId } from "../store.ts";
 import "../styles.css";
 
 /** Root document route for the starter demo. */
@@ -21,8 +23,32 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RegistryProvider>
+      <UserPicker />
       <Outlet />
     </RegistryProvider>
+  );
+}
+
+function UserPicker() {
+  const hydrated = useHydrated();
+  const [userId, selectUser] = useAtom(userAtom);
+  return (
+    <>
+      <label className="user-picker">
+        Demo user
+        <select
+          value={userId}
+          disabled={!hydrated}
+          onChange={(event) => selectUser(UserId.make(event.currentTarget.value))}
+        >
+          <option value="alice">Alice</option>
+          <option value="bob">Bob</option>
+        </select>
+      </label>
+      <p className="hint">
+        Public demo — switching users is not authentication. Don’t store private data.
+      </p>
+    </>
   );
 }
 

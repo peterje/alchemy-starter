@@ -1,23 +1,14 @@
-import { useAtom, useAtomSuspense } from "@effect/atom-react";
+import { useAtom, useAtomSuspense, useAtomValue } from "@effect/atom-react";
 import { createFileRoute, useHydrated } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { AsyncResult, Atom, AtomHttpApi } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { Suspense } from "react";
-import { type Note, NoteInput, NotesApi, UserId } from "../notes.ts";
-import { pageOrigin } from "../page-origin.ts";
+import { client, userAtom } from "../atoms.ts";
+import { type Note, NoteInput, noteListLimit } from "../notes.ts";
+import type { UserId } from "../store.ts";
 
-export const Route = createFileRoute("/")({ component: HomePage });
+export const Route = createFileRoute("/")({ component: NotesPage });
 
-const client = AtomHttpApi.Service()("NotesClient", {
-  api: NotesApi,
-  httpClient: FetchHttpClient.layer,
-  // workerd requires absolute URLs; resolve against the request origin during SSR.
-  transformClient: HttpClient.mapRequest((request) =>
-    HttpClientRequest.prependUrl(request, pageOrigin()),
-  ),
-});
-const userAtom = Atom.make(UserId.make("alice"));
 const notesAtom = Atom.family((userId: UserId) =>
   client.query("notes", "list", {
     params: { userId },
@@ -29,17 +20,17 @@ const createAtom = client.mutation("notes", "create");
 const updateAtom = client.mutation("notes", "update");
 const removeAtom = client.mutation("notes", "remove");
 
-function HomePage() {
+function NotesPage() {
   return (
     <Suspense fallback={<p role="status">Loading notes…</p>}>
-      <NotesDemo />
+      <Notes />
     </Suspense>
   );
 }
 
-function NotesDemo() {
+function Notes() {
   const hydrated = useHydrated();
-  const [userId, selectUser] = useAtom(userAtom);
+  const userId = useAtomValue(userAtom);
   const notes = useAtomSuspense(notesAtom(userId), { includeFailure: true });
   const [created, create] = useAtom(createAtom, { mode: "promiseExit" });
   const [updated, update] = useAtom(updateAtom, { mode: "promiseExit" });
@@ -49,85 +40,68 @@ function NotesDemo() {
   const failed = [created, updated, removed].some(AsyncResult.isFailure);
 
   return (
-    <>
-      <label className="user-picker">
-        Demo user
-        <select
-          value={userId}
-          disabled={busy}
-          onChange={(event) => selectUser(UserId.make(event.currentTarget.value))}
-        >
-          <option value="alice">Alice</option>
-          <option value="bob">Bob</option>
-        </select>
-      </label>
-      <p className="hint">
-        Public demo — switching users is not authentication. Don’t store private notes.
-      </p>
-
-      <section key={userId} aria-label={`${userId}'s notes`}>
-        <NoteForm
-          busy={busy}
-          submitLabel={AsyncResult.isWaiting(created) ? "Saving…" : "Add note"}
-          onSubmit={(payload) => create({ params: { userId }, payload, reactivityKeys: [userId] })}
-        />
-        {failed ? (
-          <p role="alert" className="error">
-            Could not save your change. Your draft is still here — try again.
+    <section key={userId} aria-label={`${userId}'s notes`}>
+      <NoteForm
+        busy={busy}
+        submitLabel={AsyncResult.isWaiting(created) ? "Saving…" : "Add note"}
+        onSubmit={(payload) => create({ params: { userId }, payload, reactivityKeys: [userId] })}
+      />
+      {failed ? (
+        <p role="alert" className="error">
+          Could not save your change. Your draft is still here — try again.
+        </p>
+      ) : null}
+      {AsyncResult.isFailure(notes) ? (
+        <p role="alert" className="error">
+          Could not load notes. Reload to try again.
+        </p>
+      ) : null}
+      {AsyncResult.isSuccess(notes) ? (
+        <>
+          <p className="hint" aria-live="polite">
+            {notes.value.length} notes · showing the latest {noteListLimit}
           </p>
-        ) : null}
-        {AsyncResult.isFailure(notes) ? (
-          <p role="alert" className="error">
-            Could not load notes. Reload to try again.
-          </p>
-        ) : null}
-        {AsyncResult.isSuccess(notes) ? (
-          <>
-            <p className="hint" aria-live="polite">
-              {notes.value.length} notes · showing the latest 100
-            </p>
-            {notes.value.length === 0 ? (
-              <p className="empty">No notes yet. Add your first one.</p>
-            ) : null}
-            <ul>
-              {notes.value.map((note) => (
-                <li key={note.id}>
-                  <article aria-label={note.title}>
-                    <h2>{note.title}</h2>
-                    <p className="note-body">{note.body}</p>
-                    <details>
-                      <summary>Edit note</summary>
-                      <NoteForm
-                        note={note}
-                        busy={busy}
-                        submitLabel="Save changes"
-                        onSubmit={(payload) =>
-                          update({
-                            params: { userId, id: note.id },
-                            payload,
-                            reactivityKeys: [userId],
-                          })
-                        }
-                      />
-                    </details>
-                    <button
-                      className="delete"
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        remove({ params: { userId, id: note.id }, reactivityKeys: [userId] })
+          {notes.value.length === 0 ? (
+            <p className="empty">No notes yet. Add your first one.</p>
+          ) : null}
+          <ul>
+            {notes.value.map((note) => (
+              <li key={note.id}>
+                <article aria-label={note.title}>
+                  <h2>{note.title}</h2>
+                  <p className="note-body">{note.body}</p>
+                  <details>
+                    <summary>Edit note</summary>
+                    <NoteForm
+                      note={note}
+                      busy={busy}
+                      submitLabel="Save changes"
+                      onSubmit={(payload) =>
+                        update({
+                          params: { userId, id: note.id },
+                          payload,
+                          reactivityKeys: [userId],
+                        })
                       }
-                    >
-                      Delete
-                    </button>
-                  </article>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-      </section>
-    </>
+                    />
+                  </details>
+                  <button
+                    className="delete"
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      remove({ params: { userId, id: note.id }, reactivityKeys: [userId] })
+                    }
+                  >
+                    Delete
+                  </button>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </section>
   );
 }
 

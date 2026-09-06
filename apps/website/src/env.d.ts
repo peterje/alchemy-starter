@@ -1,8 +1,8 @@
 import type { InferEnv } from "alchemy/Cloudflare";
-import type NotesWorker from "./worker.ts";
+import type ApiWorker from "./worker.ts";
 
 declare module "cloudflare:workers" {
   namespace Cloudflare {
-    interface Env extends InferEnv<{ NOTES: typeof NotesWorker }> {}
+    interface Env extends InferEnv<{ API: typeof ApiWorker }> {}
   }
 }

@@ -3,7 +3,9 @@ import type { HttpEffect } from "alchemy/Http";
 import { Clock, Config, Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Note, NoteId, NoteNotFound, NoteStorageError, NotesApi, UserId } from "./notes.ts";
+import { Api } from "./api.ts";
+import { Note, NoteId, NoteNotFound, noteListLimit } from "./notes.ts";
+import { StorageError, UserId } from "./store.ts";
 
 // Append only: each user's database runs the statements past its stored version on its next activation.
 const migrations = [
@@ -16,17 +18,14 @@ const migrations = [
   )`,
   "CREATE INDEX notes_updated_at ON notes (updated_at DESC, id ASC)",
 ];
-const columns = "id, title, body, created_at AS createdAt, updated_at AS updatedAt";
-const Notes = Schema.Array(Note);
-const NonEmptyNotes = Schema.NonEmptyArray(Note);
 
-/** The outer Effect discovers bindings; the inner Effect initializes each user's instance. */
-export class UserNotes extends Cloudflare.DurableObject<UserNotes, { fetch: HttpEffect }>()(
-  "UserNotes",
+/** One SQLite database per user. The outer Effect discovers bindings; the inner Effect initializes each instance. */
+export class UserStore extends Cloudflare.DurableObject<UserStore, { fetch: HttpEffect }>()(
+  "UserStore",
 ) {}
 
 // The explicit `never` stops TypeScript from inferring DurableObjectState as an extra requirement.
-const UserNotesLive = UserNotes.make<never>(
+const UserStoreLive = UserStore.make<never>(
   Effect.gen(function* () {
     const state = yield* Cloudflare.DurableObjectState;
     return Effect.gen(function* () {
@@ -50,46 +49,56 @@ const UserNotesLive = UserNotes.make<never>(
         Effect.try(() => storage.sql.exec(statement, ...bindings).toArray()).pipe(
           Effect.flatMap(Schema.decodeUnknownEffect(rows)),
           Effect.tapError(Effect.logError),
-          Effect.mapError(() => new NoteStorageError()),
+          Effect.mapError(() => new StorageError()),
         );
-      const queryNote = (
-        id: NoteId,
+      const queryOne = <Row extends Schema.Top, E>(
+        row: Row,
+        onEmpty: () => E,
         statement: string,
         ...bindings: ReadonlyArray<string | number>
       ) =>
-        Effect.flatMap(query(Notes, statement, ...bindings), (rows) => {
-          const note = rows[0];
-          return note === undefined ? Effect.fail(new NoteNotFound({ id })) : Effect.succeed(note);
+        Effect.flatMap(query(Schema.Array(row), statement, ...bindings), (rows) => {
+          const first = rows[0];
+          return first === undefined ? Effect.fail(onEmpty()) : Effect.succeed(first);
         });
 
-      const handlers = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
+      const noteColumns = "id, title, body, created_at AS createdAt, updated_at AS updatedAt";
+      const notes = HttpApiBuilder.group(Api, "notes", (handlers) =>
         handlers.handleAll({
-          // Keep the demo response bounded; introduce pagination for larger histories.
           list: () =>
-            query(Notes, `SELECT ${columns} FROM notes ORDER BY updated_at DESC, id ASC LIMIT 100`),
+            query(
+              Schema.Array(Note),
+              `SELECT ${noteColumns} FROM notes ORDER BY updated_at DESC, id ASC LIMIT ${noteListLimit}`,
+            ),
           get: ({ params }) =>
-            queryNote(params.id, `SELECT ${columns} FROM notes WHERE id = ?`, params.id),
+            queryOne(
+              Note,
+              () => new NoteNotFound({ id: params.id }),
+              `SELECT ${noteColumns} FROM notes WHERE id = ?`,
+              params.id,
+            ),
           create: ({ payload }) =>
             Effect.gen(function* () {
               const id = yield* Effect.sync(() => NoteId.make(crypto.randomUUID()));
               const now = yield* Clock.currentTimeMillis;
-              const [note] = yield* query(
-                NonEmptyNotes,
-                `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${columns}`,
+              return yield* queryOne(
+                Note,
+                () => new StorageError(),
+                `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${noteColumns}`,
                 id,
                 payload.title,
                 payload.body,
                 now,
                 now,
               );
-              return note;
             }),
           update: ({ params, payload }) =>
             Effect.gen(function* () {
               const now = yield* Clock.currentTimeMillis;
-              return yield* queryNote(
-                params.id,
-                `UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING ${columns}`,
+              return yield* queryOne(
+                Note,
+                () => new NoteNotFound({ id: params.id }),
+                `UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING ${noteColumns}`,
                 payload.title,
                 payload.body,
                 now,
@@ -97,13 +106,19 @@ const UserNotesLive = UserNotes.make<never>(
               );
             }),
           remove: ({ params }) =>
-            queryNote(params.id, `DELETE FROM notes WHERE id = ? RETURNING ${columns}`, params.id),
+            queryOne(
+              Note,
+              () => new NoteNotFound({ id: params.id }),
+              `DELETE FROM notes WHERE id = ? RETURNING ${noteColumns}`,
+              params.id,
+            ),
         }),
       );
+
       return {
         fetch: yield* HttpRouter.toHttpEffect(
-          HttpApiBuilder.layer(NotesApi).pipe(
-            Layer.provide(handlers),
+          HttpApiBuilder.layer(Api).pipe(
+            Layer.provide(notes),
             Layer.provide(HttpServer.layerServices),
           ),
         ),
@@ -112,8 +127,8 @@ const UserNotesLive = UserNotes.make<never>(
   }),
 );
 
-export default class NotesWorker extends Cloudflare.Worker<NotesWorker>()(
-  "NotesApi",
+export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
+  "Api",
   Effect.gen(function* () {
     return {
       main: import.meta.url,
@@ -122,16 +137,16 @@ export default class NotesWorker extends Cloudflare.Worker<NotesWorker>()(
     };
   }),
   Effect.gen(function* () {
-    const notes = yield* UserNotes;
+    const stores = yield* UserStore;
     // Demo routing only. Select the object from a verified session before storing private data.
     const forward = HttpRouter.add("*", "/api/users/:userId/*", (request) =>
       HttpRouter.schemaPathParams(Schema.Struct({ userId: UserId })).pipe(
-        Effect.flatMap(({ userId }) => notes.getByName(userId).fetch(request)),
+        Effect.flatMap(({ userId }) => stores.getByName(userId).fetch(request)),
         Effect.catchTag("SchemaError", () =>
           Effect.succeed(HttpServerResponse.empty({ status: 400 })),
         ),
       ),
     );
     return { fetch: yield* HttpRouter.toHttpEffect(forward) };
-  }).pipe(Effect.provide(UserNotesLive)),
+  }).pipe(Effect.provide(UserStoreLive)),
 ) {}

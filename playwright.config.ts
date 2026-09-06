@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./apps/website/test/browser",
+  testDir: "./test/browser",
   testMatch: "**/*.pw.ts",
   workers: 1,
   timeout: 60_000,

@@ -4,7 +4,9 @@ import { expect } from "bun:test";
 import { Effect, Result, Schema } from "effect";
 import { HttpBody, HttpClient } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
-import { Note, NotesApi, UserId } from "../apps/website/src/notes.ts";
+import { Api } from "../apps/website/src/api.ts";
+import { Note } from "../apps/website/src/notes.ts";
+import { UserId } from "../apps/website/src/store.ts";
 import Stack from "../alchemy.run.ts";
 
 // Deploy the real stack into local workerd, including actual Durable Object SQLite databases.
@@ -18,7 +20,7 @@ afterAll(destroy(Stack));
 
 const client = Effect.gen(function* () {
   const { websiteUrl } = yield* stack;
-  return yield* HttpApiClient.make(NotesApi, { baseUrl: websiteUrl });
+  return yield* HttpApiClient.make(Api, { baseUrl: websiteUrl });
 });
 
 test(

@@ -24,17 +24,22 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | File                                 | Purpose                                                             |
 | ------------------------------------ | ------------------------------------------------------------------- |
 | `alchemy.run.ts`                     | Deploy the Effect-native API Worker and TanStack Start website      |
-| `apps/website/src/notes.ts`          | Shared schemas, branded IDs, errors, and HttpApi contract           |
+| `apps/website/src/store.ts`          | Per-user store contract: the user ID that selects an object, errors |
+| `apps/website/src/notes.ts`          | The notes feature: schemas, branded IDs, errors, and its API group  |
+| `apps/website/src/api.ts`            | The HttpApi that composes every feature group                       |
 | `apps/website/src/worker.ts`         | Worker forwarding, DO initialization, SQL migrations, and handlers  |
-| `apps/website/src/routes/index.tsx`  | React UI and Effect Atom queries/mutations                          |
-| `apps/website/src/routes/__root.tsx` | TanStack Start document                                             |
+| `apps/website/src/atoms.ts`          | The AtomHttpApi client and demo user atom shared by every route     |
+| `apps/website/src/routes/index.tsx`  | The notes page: Effect Atom queries, mutations, and one form        |
+| `apps/website/src/routes/__root.tsx` | TanStack Start document and the demo user picker                    |
 | `apps/website/src/routes/api.$.ts`   | Same-origin API route forwarding through an Alchemy service binding |
 | `test/notes.test.ts`                 | Integration tests against actual Workers and Durable Objects        |
-| `AGENTS.md`                          | Rules and recipes for coding agents working in this repository      |
+| `test/browser/home.pw.ts`            | Playwright coverage of the UI on a separate local stage             |
+
+A feature is one contract module with an `HttpApiGroup`, one handlers block in the Durable Object, and one route. `api.ts` composes the groups, and every group shares the same per-user SQLite database and migrations list.
 
 The contract stays separate so the browser never imports Worker code. `Cloudflare.Worker` and `Cloudflare.DurableObject` define the backend runtimes as Effects. The object's inner Effect runs migrations and builds its HttpApi before serving requests. The Worker validates the user ID and forwards every `/api/users/:userId/*` request to that user's object through Alchemy's typed namespace.
 
-The website keeps the standard TanStack Start flow: SSR, file routes, and same-origin `/api`. `routes/api.$.ts` reads `env.NOTES` and forwards to the API Worker through a service binding. That framework adapter is the only runtime `cloudflare:workers` import. The API Worker has no public workers.dev endpoint, and the browser needs no API URL or CORS configuration. Effect Atom resolves relative URLs against the current request during SSR and the page origin in the browser.
+The website keeps the standard TanStack Start flow: SSR, file routes, and same-origin `/api`. `routes/api.$.ts` reads `env.API` and forwards to the API Worker through a service binding. That framework adapter is the only runtime `cloudflare:workers` import. The API Worker has no public workers.dev endpoint, and the browser needs no API URL or CORS configuration. Effect Atom resolves relative URLs against the current request during SSR and the page origin in the browser.
 
 Effect `HttpApiBuilder` handles validation, responses, and typed errors. SQL rows decode through the same Note schema. Mutations use bound parameters and `RETURNING`; missing notes produce a typed 404.
 

@@ -5,7 +5,7 @@ import { env } from "cloudflare:workers";
 export const Route = createFileRoute("/api/$")({
   server: {
     handlers: {
-      ANY: ({ request }) => env.NOTES.fetch(request),
+      ANY: ({ request }) => env.API.fetch(request),
     },
   },
 });
