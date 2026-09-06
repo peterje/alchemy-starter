@@ -4,9 +4,9 @@ import { expect } from "bun:test";
 import { Effect, Result, Schema } from "effect";
 import { HttpBody, HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
-import { Api } from "../apps/website/src/api.ts";
-import { ChatId, Membership, Message } from "../apps/website/src/chats.ts";
-import { UserId } from "../apps/website/src/user.ts";
+import { Api } from "@starter/contract/api";
+import { ChatId, Membership, Message } from "@starter/contract/chats";
+import { UserId } from "@starter/contract/user";
 import Stack from "../alchemy.run.ts";
 
 // Deploy the real stack into local workerd, including actual Durable Object SQLite databases.

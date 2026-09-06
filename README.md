@@ -21,21 +21,25 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 
 ## Read the example
 
-| File                                        | Purpose                                                              |
-| ------------------------------------------- | -------------------------------------------------------------------- |
-| `alchemy.run.ts`                            | Deploy the Effect-native API Worker and TanStack Start website       |
-| `apps/website/src/user.ts`                  | The user ID that selects an object                                   |
-| `apps/website/src/chats.ts`                 | The chats feature: schemas, branded IDs, errors, and two API groups  |
-| `apps/website/src/api.ts`                   | Which object serves which group, and the union the browser sees      |
-| `apps/website/src/database.ts`              | Migrations plus schema-decoded queries over an object's SQLite       |
-| `apps/website/src/worker.ts`                | The chat object, the user object, and the Worker that routes to them |
-| `apps/website/src/atoms.ts`                 | The AtomHttpApi client and demo user atom shared by every route      |
-| `apps/website/src/routes/index.tsx`         | A user's chats and the create form                                   |
-| `apps/website/src/routes/chats.$chatId.tsx` | One chat: members, messages, join, and send                          |
-| `apps/website/src/routes/__root.tsx`        | TanStack Start document and the demo user picker                     |
-| `apps/website/src/routes/api.$.ts`          | Same-origin API route forwarding through an Alchemy service binding  |
-| `test/chats.test.ts`                        | Integration tests against actual Workers and Durable Objects         |
-| `test/browser/chats.pw.ts`                  | Playwright coverage of two users sharing one chat                    |
+| File                                        | Purpose                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| `alchemy.run.ts`                            | Deploy the API Worker and the TanStack Start website                |
+| `packages/contract/src/user.ts`             | The user ID that selects an object                                  |
+| `packages/contract/src/chats.ts`            | The chats feature: schemas, branded IDs, errors, and two API groups |
+| `packages/contract/src/api.ts`              | Which object serves which group, and the union the browser sees     |
+| `apps/api/src/chat-room.ts`                 | One Durable Object per chat: members, messages, and its API         |
+| `apps/api/src/user-store.ts`                | One Durable Object per user: their memberships and its API          |
+| `apps/api/src/database.ts`                  | Migrations plus schema-decoded queries over an object's SQLite      |
+| `apps/api/src/worker.ts`                    | The Worker that validates the path ID and routes to an object       |
+| `apps/website/src/atoms.ts`                 | The AtomHttpApi client and demo user atom shared by every route     |
+| `apps/website/src/routes/index.tsx`         | A user's chats and the create form                                  |
+| `apps/website/src/routes/chats.$chatId.tsx` | One chat: members, messages, join, and send                         |
+| `apps/website/src/routes/__root.tsx`        | TanStack Start document and the demo user picker                    |
+| `apps/website/src/routes/api.$.ts`          | Same-origin API route forwarding through an Alchemy service binding |
+| `test/chats.test.ts`                        | Integration tests against actual Workers and Durable Objects        |
+| `test/browser/chats.pw.ts`                  | Playwright coverage of two users sharing one chat                   |
+
+The workspace is split by runtime. `packages/contract` runs everywhere and depends on Effect only. `apps/api` runs in workerd and depends on the contract and Alchemy. `apps/website` runs in the browser and SSR and depends on the contract and TanStack. The website never imports `@starter/api`; the Vite build fails if it does.
 
 ## Why two kinds of object
 
@@ -49,7 +53,7 @@ The website keeps the standard TanStack Start flow: SSR, file routes, and same-o
 
 ## Change the schema
 
-Append a SQL string to the object's migrations list in `worker.ts`. Each object stores the number of applied migrations in its synchronous KV storage and runs the pending ones on its first request after activation, inside one `storage.transactionSync`, so a failed migration rolls back and is retried next time. Never edit or remove a migration that has shipped.
+Append a SQL string to the object's migrations list in its file under `apps/api/src`. Each object stores the number of applied migrations in its synchronous KV storage and runs the pending ones on its first request after activation, inside one `storage.transactionSync`, so a failed migration rolls back and is retried next time. Never edit or remove a migration that has shipped.
 
 Alchemy handles **DO class migrations** at deploy time. These are separate from the **per-instance SQL migrations** above. Deploying code does not eagerly migrate every object's database.
 

@@ -2,7 +2,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
-const serverOnlySpecifier = /^(?:cloudflare:workers|alchemy(?:\/.*)?)$/u;
+const serverOnlySpecifier = /^(?:cloudflare:workers|alchemy(?:\/.*)?|@starter\/api(?:\/.*)?)$/u;
 
 const serverOnlyStubPrefix = "\0starter:server-only:";
 

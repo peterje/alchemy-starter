@@ -1,0 +1,14 @@
+{
+  "name": "@starter/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@starter/contract": "workspace:*",
+    "alchemy": "2.0.0-beta.72",
+    "effect": "4.0.0-rc.110"
+  }
+}

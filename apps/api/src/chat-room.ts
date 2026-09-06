@@ -1,19 +1,18 @@
 import * as Cloudflare from "alchemy/Cloudflare";
-import { Clock, Config, Effect, Layer, Option, Schema } from "effect";
-import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
+import { Clock, Effect, Layer, Option, Schema } from "effect";
+import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { ChatApi, UserApi } from "./api.ts";
+import { ChatApi } from "@starter/contract/api";
 import {
   ChatId,
   ChatNotFound,
-  Membership,
   Message,
   MessageId,
   messageListLimit,
   NotAMember,
-} from "./chats.ts";
+} from "@starter/contract/chats";
+import { UserId } from "@starter/contract/user";
 import { openDatabase } from "./database.ts";
-import { UserId } from "./user.ts";
 
 // Append only: each chat's database runs the statements past its stored version on its next activation.
 const chatMigrations = [
@@ -34,7 +33,7 @@ const MemberRow = Schema.Struct({ userId: UserId, joinedAt: Schema.Natural });
  * One object per chat: the single writer for its members and messages.
  * RPC methods return plain values, so each caller raises its own typed errors.
  */
-export class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
+export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
   "ChatRoom",
   Effect.gen(function* () {
     const state = yield* Cloudflare.DurableObjectState;
@@ -143,101 +142,5 @@ export class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
         }),
       };
     });
-  }),
-) {}
-
-// Append only: each user's database runs the statements past its stored version on its next activation.
-const userMigrations = [
-  "CREATE TABLE memberships (chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, joined_at INTEGER NOT NULL)",
-];
-
-/** One object per user: an index of the chats they belong to. */
-export class UserStore extends Cloudflare.DurableObject<UserStore>()(
-  "UserStore",
-  Effect.gen(function* () {
-    const rooms = yield* ChatRoom;
-    const state = yield* Cloudflare.DurableObjectState;
-    return Effect.gen(function* () {
-      const { query, queryOne } = yield* openDatabase(state, userMigrations);
-
-      // Creating or joining writes to two objects. The chat's write is authoritative and both
-      // writes are idempotent, so a retry after a partial failure converges instead of diverging.
-      const remember = (membership: Membership) =>
-        queryOne(
-          Membership,
-          `INSERT INTO memberships (chat_id, title, joined_at) VALUES (?, ?, ?)
-           ON CONFLICT (chat_id) DO UPDATE SET title = excluded.title
-           RETURNING chat_id AS chatId, title, joined_at AS joinedAt`,
-          membership.chatId,
-          membership.title,
-          membership.joinedAt,
-        );
-
-      const handlers = HttpApiBuilder.group(UserApi, "memberships", (handlers) =>
-        handlers.handleAll({
-          list: () =>
-            query(
-              Schema.Array(Membership),
-              "SELECT chat_id AS chatId, title, joined_at AS joinedAt FROM memberships ORDER BY joined_at DESC, chat_id ASC",
-            ),
-          create: ({ params, payload }) =>
-            Effect.gen(function* () {
-              const id = ChatId.make(crypto.randomUUID());
-              const membership = yield* rooms
-                .getByName(id)
-                .create(id, payload.title, params.userId);
-              return yield* remember(membership);
-            }),
-          join: ({ params }) =>
-            Effect.gen(function* () {
-              const membership = yield* rooms.getByName(params.chatId).join(params.userId);
-              if (membership === undefined) return yield* new ChatNotFound({ id: params.chatId });
-              return yield* remember(membership);
-            }),
-        }),
-      );
-
-      return {
-        fetch: HttpApiBuilder.layer(UserApi).pipe(
-          Layer.provide(handlers),
-          Layer.provide(HttpServer.layerServices),
-          HttpRouter.toHttpEffect,
-        ),
-      };
-    });
-  }),
-) {}
-
-export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
-  "Api",
-  {
-    main: import.meta.url,
-    workersDev: false,
-    dev: { port: Config.number("API_PORT").pipe(Config.withDefault(1338)) },
-  },
-  Effect.gen(function* () {
-    const users = yield* UserStore;
-    const rooms = yield* ChatRoom;
-    // Demo routing only. Select the user's object from a verified session before storing private data.
-    return {
-      fetch: HttpRouter.addAll([
-        HttpRouter.route("*", "/api/users/:userId/*", (request) =>
-          HttpRouter.schemaPathParams(Schema.Struct({ userId: UserId })).pipe(
-            Effect.flatMap(({ userId }) => users.getByName(userId).fetch(request)),
-            Effect.catchTag("SchemaError", () =>
-              Effect.succeed(HttpServerResponse.empty({ status: 400 })),
-            ),
-          ),
-        ),
-        HttpRouter.route("*", "/api/chats/:chatId/*", (request) =>
-          HttpRouter.schemaPathParams(Schema.Struct({ chatId: ChatId })).pipe(
-            Effect.flatMap(({ chatId }) => rooms.getByName(chatId).fetch(request)),
-            Effect.catchTag("SchemaError", () =>
-              Effect.succeed(HttpServerResponse.empty({ status: 400 })),
-            ),
-          ),
-        ),
-      ]).pipe(HttpRouter.toHttpEffect),
-    };
   }),
 ) {}

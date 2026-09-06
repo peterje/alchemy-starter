@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { userAtom } from "../atoms.ts";
-import { UserId } from "../user.ts";
+import { UserId } from "@starter/contract/user";
 import "../styles.css";
 
 /** Root document route for the starter demo. */

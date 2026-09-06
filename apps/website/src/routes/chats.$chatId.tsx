@@ -4,7 +4,7 @@ import { Exit, Schema } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { Suspense } from "react";
 import { client, userAtom } from "../atoms.ts";
-import { ChatId, MessageInput, messageListLimit } from "../chats.ts";
+import { ChatId, MessageInput, messageListLimit } from "@starter/contract/chats";
 
 export const Route = createFileRoute("/chats/$chatId")({
   // A malformed ID fails here, and the route renders ChatUnavailable instead of the page.
