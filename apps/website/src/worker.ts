@@ -1,5 +1,4 @@
 import * as Cloudflare from "alchemy/Cloudflare";
-import type { HttpEffect } from "alchemy/Http";
 import { Clock, Config, Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -38,17 +37,8 @@ const messageColumns = "id, author, body, created_at AS createdAt";
  * One object per chat: the single writer for its members and messages.
  * RPC methods return plain values; typed errors are raised at the HTTP boundary of the caller.
  */
-export class ChatRoom extends Cloudflare.DurableObject<
-  ChatRoom,
-  {
-    fetch: HttpEffect;
-    create: (id: ChatId, title: string, creator: UserId) => Effect.Effect<Membership, StorageError>;
-    join: (userId: UserId) => Effect.Effect<Membership | undefined, StorageError>;
-  }
->()("ChatRoom") {}
-
-// The explicit `never` stops TypeScript from inferring DurableObjectState as an extra requirement.
-const ChatRoomLive = ChatRoom.make<never>(
+export class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
+  "ChatRoom",
   Effect.gen(function* () {
     const state = yield* Cloudflare.DurableObjectState;
     return Effect.gen(function* () {
@@ -121,7 +111,7 @@ const ChatRoomLive = ChatRoom.make<never>(
             Layer.provide(HttpServer.layerServices),
           ),
         ),
-        create: (id, title, creator) =>
+        create: (id: ChatId, title: string, creator: UserId) =>
           Effect.gen(function* () {
             const now = yield* Clock.currentTimeMillis;
             const chat = yield* queryOne(
@@ -134,7 +124,7 @@ const ChatRoomLive = ChatRoom.make<never>(
             );
             return yield* addMember(chat.id, chat.title, creator);
           }),
-        join: (userId) =>
+        join: (userId: UserId) =>
           Effect.gen(function* () {
             const chats = yield* query(Schema.Array(ChatRow), `SELECT ${chatColumns} FROM chat`);
             const chat = chats[0];
@@ -143,7 +133,7 @@ const ChatRoomLive = ChatRoom.make<never>(
       };
     });
   }),
-);
+) {}
 
 // Append only: each user's database runs the statements past its stored version on its next activation.
 const userMigrations = [
@@ -152,11 +142,8 @@ const userMigrations = [
 const membershipColumns = "chat_id AS chatId, title, joined_at AS joinedAt";
 
 /** One object per user: an index of the chats they belong to. */
-export class UserStore extends Cloudflare.DurableObject<UserStore, { fetch: HttpEffect }>()(
+export class UserStore extends Cloudflare.DurableObject<UserStore>()(
   "UserStore",
-) {}
-
-const UserStoreLive = UserStore.make<ChatRoom>(
   Effect.gen(function* () {
     const rooms = yield* ChatRoom;
     const state = yield* Cloudflare.DurableObjectState;
@@ -211,7 +198,7 @@ const UserStoreLive = UserStore.make<ChatRoom>(
       };
     });
   }),
-);
+) {}
 
 export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   "Api",
@@ -245,5 +232,5 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
       ),
     );
     return { fetch: yield* HttpRouter.toHttpEffect(routes) };
-  }).pipe(Effect.provide(Layer.provideMerge(UserStoreLive, ChatRoomLive))),
+  }),
 ) {}
