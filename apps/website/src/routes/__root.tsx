@@ -1,5 +1,12 @@
 import { RegistryProvider, useAtom } from "@effect/atom-react";
-import { HeadContent, Outlet, Scripts, createRootRoute, useHydrated } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Link,
+  Outlet,
+  Scripts,
+  createRootRoute,
+  useHydrated,
+} from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { userAtom } from "../atoms.ts";
 import { UserId } from "../store.ts";
@@ -60,11 +67,13 @@ function Document({ children }: Readonly<{ children: ReactNode }>) {
       </head>
       <body>
         <main className="demo-app">
-          <p className="eyebrow">Alchemy + Effect starter</p>
-          <h1>Your notes, your object.</h1>
+          <p className="eyebrow">
+            <Link to="/">Alchemy + Effect starter</Link>
+          </p>
+          <h1>Every chat is an object.</h1>
           <p className="lede">
-            A schema-first Effect API stores each user's notes in a Durable Object with SQLite.
-            AtomHttpApi drives queries and mutations. No ORM.
+            Each chat is a Durable Object with its own SQLite database: one writer for its members
+            and messages. Each user's object indexes the chats they belong to. No ORM.
           </p>
           {children}
         </main>

@@ -1,10 +1,10 @@
 # Alchemy starter
 
-A small notes demo with **Effect, Alchemy, and TanStack Start**. Each user gets a Durable Object with its own SQLite database. No ORM, repository adapters, or mock storage.
+A small chat demo with **Effect, Alchemy, and TanStack Start**. Each chat is a Durable Object with its own SQLite database, and each user's object indexes the chats they belong to. No ORM, repository adapters, or mock storage.
 
-The UI switches between Alice and Bob, creates notes, edits them, and deletes them. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes each user's query after mutations.
+The UI switches between Alice and Bob, creates chats, joins them by URL, and posts messages. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
 
-**This is a public demo, not an authenticated app.** The selected user ID controls routing, not authorization. Before storing private data, authenticate requests and select the Durable Object from the verified session instead of a client-supplied ID.
+**This is a public demo, not an authenticated app.** The selected user ID controls routing and names the author of a message. Before storing private data, authenticate requests and take the user from the verified session instead of the client.
 
 ## Run
 
@@ -21,40 +21,42 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 
 ## Read the example
 
-| File                                 | Purpose                                                             |
-| ------------------------------------ | ------------------------------------------------------------------- |
-| `alchemy.run.ts`                     | Deploy the Effect-native API Worker and TanStack Start website      |
-| `apps/website/src/store.ts`          | Per-user store contract: the user ID that selects an object, errors |
-| `apps/website/src/notes.ts`          | The notes feature: schemas, branded IDs, errors, and its API group  |
-| `apps/website/src/api.ts`            | The HttpApi that composes every feature group                       |
-| `apps/website/src/worker.ts`         | Worker forwarding, DO initialization, SQL migrations, and handlers  |
-| `apps/website/src/atoms.ts`          | The AtomHttpApi client and demo user atom shared by every route     |
-| `apps/website/src/routes/index.tsx`  | The notes page: Effect Atom queries, mutations, and one form        |
-| `apps/website/src/routes/__root.tsx` | TanStack Start document and the demo user picker                    |
-| `apps/website/src/routes/api.$.ts`   | Same-origin API route forwarding through an Alchemy service binding |
-| `test/notes.test.ts`                 | Integration tests against actual Workers and Durable Objects        |
-| `test/browser/home.pw.ts`            | Playwright coverage of the UI on a separate local stage             |
+| File                                        | Purpose                                                              |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `alchemy.run.ts`                            | Deploy the Effect-native API Worker and TanStack Start website       |
+| `apps/website/src/store.ts`                 | The user ID that selects an object, and the storage error            |
+| `apps/website/src/chats.ts`                 | The chats feature: schemas, branded IDs, errors, and two API groups  |
+| `apps/website/src/api.ts`                   | Which object serves which group, and the union the browser sees      |
+| `apps/website/src/database.ts`              | Migrations plus schema-decoded queries over an object's SQLite       |
+| `apps/website/src/worker.ts`                | The chat object, the user object, and the Worker that routes to them |
+| `apps/website/src/atoms.ts`                 | The AtomHttpApi client and demo user atom shared by every route      |
+| `apps/website/src/routes/index.tsx`         | A user's chats and the create form                                   |
+| `apps/website/src/routes/chats.$chatId.tsx` | One chat: members, messages, join, and send                          |
+| `apps/website/src/routes/__root.tsx`        | TanStack Start document and the demo user picker                     |
+| `apps/website/src/routes/api.$.ts`          | Same-origin API route forwarding through an Alchemy service binding  |
+| `test/chats.test.ts`                        | Integration tests against actual Workers and Durable Objects         |
+| `test/browser/chats.pw.ts`                  | Playwright coverage of two users sharing one chat                    |
 
-A feature is one contract module with an `HttpApiGroup`, one handlers block in the Durable Object, and one route. `api.ts` composes the groups, and every group shares the same per-user SQLite database and migrations list.
+## Why two kinds of object
 
-The contract stays separate so the browser never imports Worker code. `Cloudflare.Worker` and `Cloudflare.DurableObject` define the backend runtimes as Effects. The object's inner Effect runs migrations and builds its HttpApi before serving requests. The Worker validates the user ID and forwards every `/api/users/:userId/*` request to that user's object through Alchemy's typed namespace.
+`ChatRoom` is one object per chat. It is the single writer for that chat's members and messages, so concurrent posts serialize without locks and membership checks read consistent state. `UserStore` is one object per user and holds only an index of memberships, which is what makes "each user has many chats" answerable without a global table.
 
-The website keeps the standard TanStack Start flow: SSR, file routes, and same-origin `/api`. `routes/api.$.ts` reads `env.API` and forwards to the API Worker through a service binding. That framework adapter is the only runtime `cloudflare:workers` import. The API Worker has no public workers.dev endpoint, and the browser needs no API URL or CORS configuration. Effect Atom resolves relative URLs against the current request during SSR and the page origin in the browser.
+Creating or joining a chat writes to both. The chat's write is authoritative and both writes are idempotent, so a retry after a partial failure converges. The user's object calls the chat's object through Alchemy's typed stub; those RPC methods return plain values, and typed HTTP errors are raised by whichever object serves the request.
 
-Effect `HttpApiBuilder` handles validation, responses, and typed errors. SQL rows decode through the same Note schema. Mutations use bound parameters and `RETURNING`; missing notes produce a typed 404.
+Each object serves its own `HttpApi` because Effect requires every group of an API to be handled by one server. `api.ts` names that topology: a user API, a chat API, and the union the browser and tests use. The Worker validates the ID in the path and forwards `/api/users/:userId/*` and `/api/chats/:chatId/*` to the matching object.
 
-The API lives at `/api/users/:userId/notes/`, with `GET`/`POST` for the collection and `GET`/`PUT`/`DELETE` at `/:id`. Lists return the latest 100 notes. Titles are trimmed and limited to 120 characters; bodies are limited to 20,000 characters.
+The website keeps the standard TanStack Start flow: SSR, file routes, and same-origin `/api`. `routes/api.$.ts` reads `env.API` and forwards to the API Worker through a service binding. That framework adapter is the only runtime `cloudflare:workers` import. The API Worker has no public workers.dev endpoint, and the browser needs no API URL or CORS configuration.
 
 ## Change the schema
 
-Append a SQL string to `migrations` in `worker.ts`. Each object stores the number of applied migrations in its synchronous KV storage and runs the pending ones on its first request after activation, inside one `storage.transactionSync`, so a failed migration rolls back and is retried on the next activation. Never edit or remove a migration that has shipped.
+Append a SQL string to the object's migrations list in `worker.ts`. Each object stores the number of applied migrations in its synchronous KV storage and runs the pending ones on its first request after activation, inside one `storage.transactionSync`, so a failed migration rolls back and is retried next time. Never edit or remove a migration that has shipped.
 
-Alchemy handles **DO class migrations** at deploy time. These are separate from the **per-instance SQL migrations** above. Deploying code does not eagerly migrate every user's database.
+Alchemy handles **DO class migrations** at deploy time. These are separate from the **per-instance SQL migrations** above. Deploying code does not eagerly migrate every object's database.
 
-See [Alchemy's integration testing tutorial](https://alchemy.run/cloudflare/tutorial/part-3/) for the `Test.make` → `beforeAll(deploy(Stack))` → HTTP assertions → `afterAll(destroy(Stack))` pattern. These tests use `dev: true` for actual local workerd SQLite, not a fake database. Browser tests also cover user isolation, reloads, and preserving drafts after failed writes.
+See [Alchemy's integration testing tutorial](https://alchemy.run/cloudflare/tutorial/part-3/) for the `Test.make` → `beforeAll(deploy(Stack))` → HTTP assertions → `afterAll(destroy(Stack))` pattern. These tests use `dev: true` for actual local workerd SQLite, not a fake database.
 
 ## Tooling
 
-The template keeps TypeScript strictness, Effect/React architecture lint rules in `packages/oxlint-plugins`, oxfmt, commit hooks, Playwright, and GitHub Actions. The browser build rejects server-only imports. No React `useState`/`useEffect` or additional client state library is needed. `AGENTS.md` tells coding agents how to extend the example.
+The template keeps TypeScript strictness, Effect/React architecture lint rules in `packages/oxlint-plugins`, oxfmt, commit hooks, Playwright, and GitHub Actions. The browser build rejects server-only imports. No React `useState`/`useEffect` or additional client state library is needed.
 
 Provision CI credentials with `bun run ci:provision` after pointing `stacks/github.ts` at your repository. Production deploys remain gated by the repository's `CLOUDFLARE_DEPLOY_ENABLED` variable.

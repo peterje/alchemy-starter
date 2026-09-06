@@ -3,122 +3,208 @@ import type { HttpEffect } from "alchemy/Http";
 import { Clock, Config, Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Api } from "./api.ts";
-import { Note, NoteId, NoteNotFound, noteListLimit } from "./notes.ts";
+import { ChatApi, UserApi } from "./api.ts";
+import {
+  ChatId,
+  ChatNotFound,
+  Membership,
+  Message,
+  MessageId,
+  messageListLimit,
+  NotAMember,
+} from "./chats.ts";
+import { openDatabase } from "./database.ts";
 import { StorageError, UserId } from "./store.ts";
 
-// Append only: each user's database runs the statements past its stored version on its next activation.
-const migrations = [
-  `CREATE TABLE notes (
+// Append only: each chat's database runs the statements past its stored version on its next activation.
+const chatMigrations = [
+  "CREATE TABLE chat (id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at INTEGER NOT NULL)",
+  "CREATE TABLE members (user_id TEXT PRIMARY KEY, joined_at INTEGER NOT NULL)",
+  `CREATE TABLE messages (
     id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
+    author TEXT NOT NULL,
     body TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL
   )`,
-  "CREATE INDEX notes_updated_at ON notes (updated_at DESC, id ASC)",
+  "CREATE INDEX messages_created_at ON messages (created_at ASC, id ASC)",
 ];
+const ChatRow = Schema.Struct({ id: ChatId, title: Schema.String, createdAt: Schema.Number });
+const chatColumns = "id, title, created_at AS createdAt";
+const MemberRow = Schema.Struct({ userId: UserId, joinedAt: Schema.Number });
+const memberColumns = "user_id AS userId, joined_at AS joinedAt";
+const messageColumns = "id, author, body, created_at AS createdAt";
 
-/** One SQLite database per user. The outer Effect discovers bindings; the inner Effect initializes each instance. */
-export class UserStore extends Cloudflare.DurableObject<UserStore, { fetch: HttpEffect }>()(
-  "UserStore",
-) {}
+/**
+ * One object per chat: the single writer for its members and messages.
+ * RPC methods return plain values; typed errors are raised at the HTTP boundary of the caller.
+ */
+export class ChatRoom extends Cloudflare.DurableObject<
+  ChatRoom,
+  {
+    fetch: HttpEffect;
+    create: (id: ChatId, title: string, creator: UserId) => Effect.Effect<Membership, StorageError>;
+    join: (userId: UserId) => Effect.Effect<Membership | undefined, StorageError>;
+  }
+>()("ChatRoom") {}
 
 // The explicit `never` stops TypeScript from inferring DurableObjectState as an extra requirement.
-const UserStoreLive = UserStore.make<never>(
+const ChatRoomLive = ChatRoom.make<never>(
   Effect.gen(function* () {
     const state = yield* Cloudflare.DurableObjectState;
     return Effect.gen(function* () {
-      const storage = state.raw.storage;
-      // Schema and version commit together, so a failed migration is retried on the next activation.
-      yield* Effect.sync(() =>
-        storage.transactionSync(() => {
-          const version = Schema.decodeUnknownSync(Schema.Number)(
-            storage.kv.get("schemaVersion") ?? 0,
-          );
-          for (const sql of migrations.slice(version)) storage.sql.exec(sql);
-          storage.kv.put("schemaVersion", migrations.length);
-        }),
-      );
+      const { query, queryOne } = yield* openDatabase(state.raw.storage, chatMigrations);
 
-      const query = <Rows extends Schema.Top>(
-        rows: Rows,
-        statement: string,
-        ...bindings: ReadonlyArray<string | number>
-      ) =>
-        Effect.try(() => storage.sql.exec(statement, ...bindings).toArray()).pipe(
-          Effect.flatMap(Schema.decodeUnknownEffect(rows)),
-          Effect.tapError(Effect.logError),
-          Effect.mapError(() => new StorageError()),
-        );
-      const queryOne = <Row extends Schema.Top, E>(
-        row: Row,
-        onEmpty: () => E,
-        statement: string,
-        ...bindings: ReadonlyArray<string | number>
-      ) =>
-        Effect.flatMap(query(Schema.Array(row), statement, ...bindings), (rows) => {
-          const first = rows[0];
-          return first === undefined ? Effect.fail(onEmpty()) : Effect.succeed(first);
+      // Joining twice returns the original membership, so callers can retry safely.
+      const addMember = (chatId: ChatId, title: string, userId: UserId) =>
+        Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis;
+          const member = yield* queryOne(
+            MemberRow,
+            () => new StorageError(),
+            `INSERT INTO members (user_id, joined_at) VALUES (?, ?)
+             ON CONFLICT (user_id) DO UPDATE SET joined_at = joined_at RETURNING ${memberColumns}`,
+            userId,
+            now,
+          );
+          return { chatId, title, joinedAt: member.joinedAt };
         });
 
-      const noteColumns = "id, title, body, created_at AS createdAt, updated_at AS updatedAt";
-      const notes = HttpApiBuilder.group(Api, "notes", (handlers) =>
+      const handlers = HttpApiBuilder.group(ChatApi, "chat", (handlers) =>
         handlers.handleAll({
-          list: () =>
-            query(
-              Schema.Array(Note),
-              `SELECT ${noteColumns} FROM notes ORDER BY updated_at DESC, id ASC LIMIT ${noteListLimit}`,
-            ),
           get: ({ params }) =>
-            queryOne(
-              Note,
-              () => new NoteNotFound({ id: params.id }),
-              `SELECT ${noteColumns} FROM notes WHERE id = ?`,
-              params.id,
-            ),
-          create: ({ payload }) =>
             Effect.gen(function* () {
-              const id = yield* Effect.sync(() => NoteId.make(crypto.randomUUID()));
+              const chat = yield* queryOne(
+                ChatRow,
+                () => new ChatNotFound({ id: params.chatId }),
+                `SELECT ${chatColumns} FROM chat`,
+              );
+              const members = yield* query(
+                Schema.Array(MemberRow),
+                `SELECT ${memberColumns} FROM members ORDER BY joined_at ASC, user_id ASC`,
+              );
+              return { ...chat, members: members.map((member) => member.userId) };
+            }),
+          messages: () =>
+            query(
+              Schema.Array(Message),
+              `SELECT id, author, body, createdAt FROM (
+                 SELECT ${messageColumns} FROM messages ORDER BY created_at DESC, id DESC LIMIT ${messageListLimit}
+               ) ORDER BY createdAt ASC, id ASC`,
+            ),
+          post: ({ params, payload }) =>
+            Effect.gen(function* () {
+              yield* queryOne(
+                MemberRow,
+                () => new NotAMember({ chatId: params.chatId, userId: payload.author }),
+                `SELECT ${memberColumns} FROM members WHERE user_id = ?`,
+                payload.author,
+              );
+              const id = yield* Effect.sync(() => MessageId.make(crypto.randomUUID()));
               const now = yield* Clock.currentTimeMillis;
               return yield* queryOne(
-                Note,
+                Message,
                 () => new StorageError(),
-                `INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${noteColumns}`,
+                `INSERT INTO messages (id, author, body, created_at) VALUES (?, ?, ?, ?) RETURNING ${messageColumns}`,
                 id,
-                payload.title,
+                payload.author,
                 payload.body,
-                now,
                 now,
               );
             }),
-          update: ({ params, payload }) =>
-            Effect.gen(function* () {
-              const now = yield* Clock.currentTimeMillis;
-              return yield* queryOne(
-                Note,
-                () => new NoteNotFound({ id: params.id }),
-                `UPDATE notes SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING ${noteColumns}`,
-                payload.title,
-                payload.body,
-                now,
-                params.id,
-              );
-            }),
-          remove: ({ params }) =>
-            queryOne(
-              Note,
-              () => new NoteNotFound({ id: params.id }),
-              `DELETE FROM notes WHERE id = ? RETURNING ${noteColumns}`,
-              params.id,
-            ),
         }),
       );
 
       return {
         fetch: yield* HttpRouter.toHttpEffect(
-          HttpApiBuilder.layer(Api).pipe(
-            Layer.provide(notes),
+          HttpApiBuilder.layer(ChatApi).pipe(
+            Layer.provide(handlers),
+            Layer.provide(HttpServer.layerServices),
+          ),
+        ),
+        create: (id, title, creator) =>
+          Effect.gen(function* () {
+            const now = yield* Clock.currentTimeMillis;
+            const chat = yield* queryOne(
+              ChatRow,
+              () => new StorageError(),
+              `INSERT INTO chat (id, title, created_at) VALUES (?, ?, ?) RETURNING ${chatColumns}`,
+              id,
+              title,
+              now,
+            );
+            return yield* addMember(chat.id, chat.title, creator);
+          }),
+        join: (userId) =>
+          Effect.gen(function* () {
+            const chats = yield* query(Schema.Array(ChatRow), `SELECT ${chatColumns} FROM chat`);
+            const chat = chats[0];
+            return chat === undefined ? undefined : yield* addMember(chat.id, chat.title, userId);
+          }),
+      };
+    });
+  }),
+);
+
+// Append only: each user's database runs the statements past its stored version on its next activation.
+const userMigrations = [
+  "CREATE TABLE memberships (chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, joined_at INTEGER NOT NULL)",
+];
+const membershipColumns = "chat_id AS chatId, title, joined_at AS joinedAt";
+
+/** One object per user: an index of the chats they belong to. */
+export class UserStore extends Cloudflare.DurableObject<UserStore, { fetch: HttpEffect }>()(
+  "UserStore",
+) {}
+
+const UserStoreLive = UserStore.make<ChatRoom>(
+  Effect.gen(function* () {
+    const rooms = yield* ChatRoom;
+    const state = yield* Cloudflare.DurableObjectState;
+    return Effect.gen(function* () {
+      const { query, queryOne } = yield* openDatabase(state.raw.storage, userMigrations);
+
+      // Creating or joining writes to two objects. The chat's write is authoritative and both
+      // writes are idempotent, so a retry after a partial failure converges instead of diverging.
+      const remember = (membership: Membership) =>
+        queryOne(
+          Membership,
+          () => new StorageError(),
+          `INSERT INTO memberships (chat_id, title, joined_at) VALUES (?, ?, ?)
+           ON CONFLICT (chat_id) DO UPDATE SET title = excluded.title RETURNING ${membershipColumns}`,
+          membership.chatId,
+          membership.title,
+          membership.joinedAt,
+        );
+
+      const handlers = HttpApiBuilder.group(UserApi, "memberships", (handlers) =>
+        handlers.handleAll({
+          list: () =>
+            query(
+              Schema.Array(Membership),
+              `SELECT ${membershipColumns} FROM memberships ORDER BY joined_at DESC, chat_id ASC`,
+            ),
+          create: ({ params, payload }) =>
+            Effect.gen(function* () {
+              const id = yield* Effect.sync(() => ChatId.make(crypto.randomUUID()));
+              const membership = yield* rooms
+                .getByName(id)
+                .create(id, payload.title, params.userId);
+              return yield* remember(membership);
+            }),
+          join: ({ params }) =>
+            Effect.gen(function* () {
+              const membership = yield* rooms.getByName(params.chatId).join(params.userId);
+              return membership === undefined
+                ? yield* Effect.fail(new ChatNotFound({ id: params.chatId }))
+                : yield* remember(membership);
+            }),
+        }),
+      );
+
+      return {
+        fetch: yield* HttpRouter.toHttpEffect(
+          HttpApiBuilder.layer(UserApi).pipe(
+            Layer.provide(handlers),
             Layer.provide(HttpServer.layerServices),
           ),
         ),
@@ -137,16 +223,27 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     };
   }),
   Effect.gen(function* () {
-    const stores = yield* UserStore;
-    // Demo routing only. Select the object from a verified session before storing private data.
-    const forward = HttpRouter.add("*", "/api/users/:userId/*", (request) =>
-      HttpRouter.schemaPathParams(Schema.Struct({ userId: UserId })).pipe(
-        Effect.flatMap(({ userId }) => stores.getByName(userId).fetch(request)),
-        Effect.catchTag("SchemaError", () =>
-          Effect.succeed(HttpServerResponse.empty({ status: 400 })),
+    const users = yield* UserStore;
+    const rooms = yield* ChatRoom;
+    // Demo routing only. Select the user's object from a verified session before storing private data.
+    const routes = Layer.mergeAll(
+      HttpRouter.add("*", "/api/users/:userId/*", (request) =>
+        HttpRouter.schemaPathParams(Schema.Struct({ userId: UserId })).pipe(
+          Effect.flatMap(({ userId }) => users.getByName(userId).fetch(request)),
+          Effect.catchTag("SchemaError", () =>
+            Effect.succeed(HttpServerResponse.empty({ status: 400 })),
+          ),
+        ),
+      ),
+      HttpRouter.add("*", "/api/chats/:chatId/*", (request) =>
+        HttpRouter.schemaPathParams(Schema.Struct({ chatId: ChatId })).pipe(
+          Effect.flatMap(({ chatId }) => rooms.getByName(chatId).fetch(request)),
+          Effect.catchTag("SchemaError", () =>
+            Effect.succeed(HttpServerResponse.empty({ status: 400 })),
+          ),
         ),
       ),
     );
-    return { fetch: yield* HttpRouter.toHttpEffect(forward) };
-  }).pipe(Effect.provide(UserStoreLive)),
+    return { fetch: yield* HttpRouter.toHttpEffect(routes) };
+  }).pipe(Effect.provide(Layer.provideMerge(UserStoreLive, ChatRoomLive))),
 ) {}

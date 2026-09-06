@@ -1,5 +1,11 @@
 import { HttpApi } from "effect/unstable/httpapi";
-import { NotesGroup } from "./notes.ts";
+import { ChatGroup, MembershipsGroup } from "./chats.ts";
 
-/** Every group is served from the user's Durable Object; add new feature groups here. */
-export class Api extends HttpApi.make("Api").add(NotesGroup).prefix("/api") {}
+/** Served by each user's Durable Object. */
+export class UserApi extends HttpApi.make("UserApi").add(MembershipsGroup).prefix("/api") {}
+
+/** Served by each chat's Durable Object. */
+export class ChatApi extends HttpApi.make("ChatApi").add(ChatGroup).prefix("/api") {}
+
+/** What the browser sees: every object's groups behind one origin. */
+export class Api extends HttpApi.make("Api").add(MembershipsGroup).add(ChatGroup).prefix("/api") {}

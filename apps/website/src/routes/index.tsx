@@ -1,159 +1,95 @@
 import { useAtom, useAtomSuspense, useAtomValue } from "@effect/atom-react";
-import { createFileRoute, useHydrated } from "@tanstack/react-router";
+import { Link, createFileRoute, useHydrated, useNavigate } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { Suspense } from "react";
 import { client, userAtom } from "../atoms.ts";
-import { type Note, NoteInput, noteListLimit } from "../notes.ts";
+import { ChatInput } from "../chats.ts";
 import type { UserId } from "../store.ts";
 
-export const Route = createFileRoute("/")({ component: NotesPage });
+export const Route = createFileRoute("/")({ component: MembershipsPage });
 
-const notesAtom = Atom.family((userId: UserId) =>
-  client.query("notes", "list", {
+const membershipsAtom = Atom.family((userId: UserId) =>
+  client.query("memberships", "list", {
     params: { userId },
     reactivityKeys: [userId],
     serializationKey: userId,
   }),
 );
-const createAtom = client.mutation("notes", "create");
-const updateAtom = client.mutation("notes", "update");
-const removeAtom = client.mutation("notes", "remove");
+const createAtom = client.mutation("memberships", "create");
 
-function NotesPage() {
+function MembershipsPage() {
   return (
-    <Suspense fallback={<p role="status">Loading notes…</p>}>
-      <Notes />
+    <Suspense fallback={<p role="status">Loading chats…</p>}>
+      <Memberships />
     </Suspense>
   );
 }
 
-function Notes() {
+function Memberships() {
   const hydrated = useHydrated();
+  const navigate = useNavigate();
   const userId = useAtomValue(userAtom);
-  const notes = useAtomSuspense(notesAtom(userId), { includeFailure: true });
+  const memberships = useAtomSuspense(membershipsAtom(userId), { includeFailure: true });
   const [created, create] = useAtom(createAtom, { mode: "promiseExit" });
-  const [updated, update] = useAtom(updateAtom, { mode: "promiseExit" });
-  const [removed, remove] = useAtom(removeAtom);
-  // SSR renders the forms before React can handle submissions. Wait for hydration before enabling them.
-  const busy = !hydrated || [created, updated, removed].some(AsyncResult.isWaiting);
-  const failed = [created, updated, removed].some(AsyncResult.isFailure);
+  // SSR renders the form before React can handle submissions. Wait for hydration before enabling it.
+  const busy = !hydrated || AsyncResult.isWaiting(created);
 
   return (
-    <section key={userId} aria-label={`${userId}'s notes`}>
-      <NoteForm
-        busy={busy}
-        submitLabel={AsyncResult.isWaiting(created) ? "Saving…" : "Add note"}
-        onSubmit={(payload) => create({ params: { userId }, payload, reactivityKeys: [userId] })}
-      />
-      {failed ? (
+    <section key={userId} aria-label={`${userId}'s chats`}>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          // The input's constraint attributes mirror ChatInput, so a decode failure is a bug, not user error.
+          const payload = Schema.decodeUnknownSync(ChatInput)(
+            Object.fromEntries(new FormData(event.currentTarget)),
+          );
+          const result = await create({ params: { userId }, payload, reactivityKeys: [userId] });
+          if (Exit.isSuccess(result)) {
+            await navigate({ to: "/chats/$chatId", params: { chatId: result.value.chatId } });
+          }
+        }}
+      >
+        <label htmlFor="title">New chat</label>
+        <input
+          id="title"
+          name="title"
+          disabled={busy}
+          required
+          pattern=".*\S.*"
+          maxLength={80}
+          placeholder="Standup"
+        />
+        <button type="submit" disabled={busy}>
+          {AsyncResult.isWaiting(created) ? "Creating…" : "Create chat"}
+        </button>
+      </form>
+      {AsyncResult.isFailure(created) ? (
         <p role="alert" className="error">
-          Could not save your change. Your draft is still here — try again.
+          Could not create the chat. Your title is still here — try again.
         </p>
       ) : null}
-      {AsyncResult.isFailure(notes) ? (
+      {AsyncResult.isFailure(memberships) ? (
         <p role="alert" className="error">
-          Could not load notes. Reload to try again.
+          Could not load your chats. Reload to try again.
         </p>
-      ) : null}
-      {AsyncResult.isSuccess(notes) ? (
+      ) : (
         <>
-          <p className="hint" aria-live="polite">
-            {notes.value.length} notes · showing the latest {noteListLimit}
-          </p>
-          {notes.value.length === 0 ? (
-            <p className="empty">No notes yet. Add your first one.</p>
+          <p className="hint">Open a chat and share its URL to invite the other demo user.</p>
+          {memberships.value.length === 0 ? (
+            <p className="empty">No chats yet. Create your first one.</p>
           ) : null}
-          <ul>
-            {notes.value.map((note) => (
-              <li key={note.id}>
-                <article aria-label={note.title}>
-                  <h2>{note.title}</h2>
-                  <p className="note-body">{note.body}</p>
-                  <details>
-                    <summary>Edit note</summary>
-                    <NoteForm
-                      note={note}
-                      busy={busy}
-                      submitLabel="Save changes"
-                      onSubmit={(payload) =>
-                        update({
-                          params: { userId, id: note.id },
-                          payload,
-                          reactivityKeys: [userId],
-                        })
-                      }
-                    />
-                  </details>
-                  <button
-                    className="delete"
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      remove({ params: { userId, id: note.id }, reactivityKeys: [userId] })
-                    }
-                  >
-                    Delete
-                  </button>
-                </article>
+          <ul aria-label="Your chats">
+            {memberships.value.map((membership) => (
+              <li key={membership.chatId}>
+                <Link to="/chats/$chatId" params={{ chatId: membership.chatId }}>
+                  {membership.title}
+                </Link>
               </li>
             ))}
           </ul>
         </>
-      ) : null}
+      )}
     </section>
-  );
-}
-
-function NoteForm({
-  note,
-  busy,
-  submitLabel,
-  onSubmit,
-}: Readonly<{
-  note?: Note;
-  busy: boolean;
-  submitLabel: string;
-  onSubmit: (input: NoteInput) => Promise<Exit.Exit<Note, Error>>;
-}>) {
-  const id = note?.id ?? "new";
-  return (
-    <form
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        // The inputs' constraint attributes mirror NoteInput, so a decode failure is a bug, not user error.
-        const input = Schema.decodeUnknownSync(NoteInput)(Object.fromEntries(new FormData(form)));
-        if (Exit.isSuccess(await onSubmit(input))) {
-          form.reset();
-          form.closest("details")?.removeAttribute("open");
-        }
-      }}
-    >
-      <label htmlFor={`title-${id}`}>Title</label>
-      <input
-        id={`title-${id}`}
-        name="title"
-        disabled={busy}
-        defaultValue={note?.title}
-        required
-        pattern=".*\S.*"
-        maxLength={120}
-        placeholder="Something worth remembering"
-      />
-      <label htmlFor={`body-${id}`}>Note</label>
-      <textarea
-        id={`body-${id}`}
-        name="body"
-        disabled={busy}
-        defaultValue={note?.body}
-        maxLength={20_000}
-        rows={4}
-        placeholder="Write a note…"
-      />
-      <button type="submit" disabled={busy}>
-        {submitLabel}
-      </button>
-    </form>
   );
 }
