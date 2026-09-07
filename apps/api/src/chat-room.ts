@@ -37,8 +37,9 @@ const MemberRow = Schema.Struct({ userId: UserId, joinedAt: Schema.Natural });
  */
 export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
   "ChatRoom",
-  Effect.gen(function* () {
-    return Effect.gen(function* () {
+  // No bindings to resolve in the isolate phase; each instance provides its own database.
+  Effect.succeed(
+    Effect.gen(function* () {
       const { query, queryFirst, queryOne } = yield* ObjectDatabase;
 
       // Joining twice returns the original membership, so callers can retry safely.
@@ -140,6 +141,6 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
             : undefined;
         }),
       };
-    }).pipe(Effect.provide(ObjectDatabase.layer(chatMigrations)));
-  }),
+    }).pipe(Effect.provide(ObjectDatabase.layer(chatMigrations))),
+  ),
 ) {}
