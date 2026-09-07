@@ -6,7 +6,7 @@ import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 import ChatRoom from "./chat-room.ts";
-import { openDatabase } from "./database.ts";
+import { ObjectDatabase } from "./object-database.ts";
 
 // Append only: each user's database runs the statements past its stored version on its next activation.
 const userMigrations = [
@@ -18,9 +18,8 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
   "UserStore",
   Effect.gen(function* () {
     const rooms = yield* ChatRoom;
-    const state = yield* Cloudflare.DurableObjectState;
     return Effect.gen(function* () {
-      const { query, queryOne } = yield* openDatabase(state, userMigrations);
+      const { query, queryOne } = yield* ObjectDatabase;
 
       // Creating or joining writes to two objects. The chat's write is authoritative and both
       // writes are idempotent, so a retry after a partial failure converges instead of diverging.
@@ -66,6 +65,6 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
           HttpRouter.toHttpEffect,
         ),
       };
-    });
+    }).pipe(Effect.provide(ObjectDatabase.layer(userMigrations)));
   }),
 ) {}

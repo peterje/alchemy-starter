@@ -29,7 +29,7 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | `packages/contract/src/api.ts`              | Which object serves which group, and the union the browser sees     |
 | `apps/api/src/chat-room.ts`                 | One Durable Object per chat: members, messages, and its API         |
 | `apps/api/src/user-store.ts`                | One Durable Object per user: their memberships and its API          |
-| `apps/api/src/database.ts`                  | Migrations plus schema-decoded queries over an object's SQLite      |
+| `apps/api/src/object-database.ts`           | Service for an object's own SQLite: migrations and decoded queries  |
 | `apps/api/src/worker.ts`                    | The Worker that validates the path ID and routes to an object       |
 | `apps/website/src/atoms.ts`                 | The AtomHttpApi client and demo user atom shared by every route     |
 | `apps/website/src/routes/index.tsx`         | A user's chats and the create form                                  |

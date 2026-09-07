@@ -14,7 +14,7 @@ import { Array, Clock, Effect, Layer, Option, Schema } from "effect";
 import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
-import { openDatabase } from "./database.ts";
+import { ObjectDatabase } from "./object-database.ts";
 
 // Append only: each chat's database runs the statements past its stored version on its next activation.
 const chatMigrations = [
@@ -38,9 +38,8 @@ const MemberRow = Schema.Struct({ userId: UserId, joinedAt: Schema.Natural });
 export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
   "ChatRoom",
   Effect.gen(function* () {
-    const state = yield* Cloudflare.DurableObjectState;
     return Effect.gen(function* () {
-      const { query, queryFirst, queryOne } = yield* openDatabase(state, chatMigrations);
+      const { query, queryFirst, queryOne } = yield* ObjectDatabase;
 
       // Joining twice returns the original membership, so callers can retry safely.
       const addMember = Effect.fn("ChatRoom.addMember")(function* (
@@ -141,6 +140,6 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
             : undefined;
         }),
       };
-    });
+    }).pipe(Effect.provide(ObjectDatabase.layer(chatMigrations)));
   }),
 ) {}
