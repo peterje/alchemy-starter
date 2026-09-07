@@ -52,7 +52,9 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
           join: ({ params }) =>
             Effect.gen(function* () {
               const membership = yield* rooms.getByName(params.chatId).join(params.userId);
-              if (membership === undefined) return yield* new ChatNotFound({ id: params.chatId });
+              if (membership === undefined) {
+                return yield* Effect.fail(new ChatNotFound({ id: params.chatId }));
+              }
               return yield* remember(membership);
             }),
         }),

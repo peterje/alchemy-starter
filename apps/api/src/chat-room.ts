@@ -64,16 +64,18 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
         handlers.handleAll({
           get: ({ params }) =>
             Effect.gen(function* () {
-              const chat = yield* db
-                .queryFirst(ChatRow, "SELECT id, title, created_at AS createdAt FROM chat")
-                .pipe(
-                  Effect.flatMap(Effect.fromOption(() => new ChatNotFound({ id: params.chatId }))),
-                );
+              const chat = yield* db.queryFirst(
+                ChatRow,
+                "SELECT id, title, created_at AS createdAt FROM chat",
+              );
+              if (Option.isNone(chat)) {
+                return yield* Effect.fail(new ChatNotFound({ id: params.chatId }));
+              }
               const members = yield* db.query(
                 Schema.Array(MemberRow),
                 "SELECT user_id AS userId, joined_at AS joinedAt FROM members ORDER BY joined_at ASC, user_id ASC",
               );
-              return { ...chat, members: members.map((member) => member.userId) };
+              return { ...chat.value, members: members.map((member) => member.userId) };
             }),
           messages: () =>
             db
@@ -85,19 +87,16 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
               .pipe(Effect.map(Array.reverse)),
           post: ({ params, payload }) =>
             Effect.gen(function* () {
-              yield* db
-                .queryFirst(
-                  MemberRow,
-                  "SELECT user_id AS userId, joined_at AS joinedAt FROM members WHERE user_id = ?",
-                  payload.author,
-                )
-                .pipe(
-                  Effect.flatMap(
-                    Effect.fromOption(
-                      () => new NotAMember({ chatId: params.chatId, userId: payload.author }),
-                    ),
-                  ),
+              const member = yield* db.queryFirst(
+                MemberRow,
+                "SELECT user_id AS userId, joined_at AS joinedAt FROM members WHERE user_id = ?",
+                payload.author,
+              );
+              if (Option.isNone(member)) {
+                return yield* Effect.fail(
+                  new NotAMember({ chatId: params.chatId, userId: payload.author }),
                 );
+              }
               const now = yield* Clock.currentTimeMillis;
               return yield* db.queryOne(
                 Message,
@@ -139,9 +138,8 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
             ChatRow,
             "SELECT id, title, created_at AS createdAt FROM chat",
           );
-          return Option.isSome(chat)
-            ? yield* addMember(chat.value.id, chat.value.title, userId)
-            : undefined;
+          if (Option.isNone(chat)) return undefined;
+          return yield* addMember(chat.value.id, chat.value.title, userId);
         }),
       };
     }).pipe(Effect.provide(ObjectDatabase.layer(chatMigrations))),
