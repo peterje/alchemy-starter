@@ -43,70 +43,66 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
       const db = yield* ObjectDatabase;
 
       // Joining twice returns the original membership, so callers can retry safely.
-      const addMember = Effect.fn("ChatRoom.addMember")(function* (
-        chatId: ChatId,
-        title: string,
-        userId: UserId,
-      ) {
+      const addMember = Effect.fn("ChatRoom.addMember")(function* (member: {
+        readonly chatId: ChatId;
+        readonly title: string;
+        readonly userId: UserId;
+      }) {
         const now = yield* Clock.currentTimeMillis;
-        const member = yield* db.queryOne(
-          MemberRow,
-          `INSERT INTO members (user_id, joined_at) VALUES (?, ?)
-           ON CONFLICT (user_id) DO UPDATE SET joined_at = joined_at
-           RETURNING user_id AS userId, joined_at AS joinedAt`,
-          userId,
-          now,
-        );
-        return { chatId, title, joinedAt: member.joinedAt };
+        const row = yield* db.queryOne({
+          schema: MemberRow,
+          sql: `INSERT INTO members (user_id, joined_at) VALUES (?, ?)
+                ON CONFLICT (user_id) DO UPDATE SET joined_at = joined_at
+                RETURNING user_id AS userId, joined_at AS joinedAt`,
+          values: [member.userId, now],
+        });
+        return { chatId: member.chatId, title: member.title, joinedAt: row.joinedAt };
       });
 
       const handlers = HttpApiBuilder.group(ChatApi, "chat", (handlers) =>
         handlers.handleAll({
           get: ({ params }) =>
             Effect.gen(function* () {
-              const chat = yield* db.queryFirst(
-                ChatRow,
-                "SELECT id, title, created_at AS createdAt FROM chat",
-              );
+              const chat = yield* db.queryFirst({
+                schema: ChatRow,
+                sql: "SELECT id, title, created_at AS createdAt FROM chat",
+              });
               if (Option.isNone(chat)) {
                 return yield* Effect.fail(new ChatNotFound({ id: params.chatId }));
               }
-              const members = yield* db.query(
-                Schema.Array(MemberRow),
-                "SELECT user_id AS userId, joined_at AS joinedAt FROM members ORDER BY joined_at ASC, user_id ASC",
-              );
+              const members = yield* db.query({
+                schema: Schema.Array(MemberRow),
+                sql: "SELECT user_id AS userId, joined_at AS joinedAt FROM members ORDER BY joined_at ASC, user_id ASC",
+              });
               return { ...chat.value, members: members.map((member) => member.userId) };
             }),
           messages: () =>
             db
-              .query(
-                Schema.Array(Message),
-                `SELECT id, author, body, created_at AS createdAt FROM messages
-               ORDER BY created_at DESC, id DESC LIMIT ${messageListLimit}`,
-              )
+              .query({
+                schema: Schema.Array(Message),
+                sql: `SELECT id, author, body, created_at AS createdAt FROM messages
+                      ORDER BY created_at DESC, id DESC LIMIT ${messageListLimit}`,
+              })
               .pipe(Effect.map(Array.reverse)),
           post: ({ params, payload }) =>
             Effect.gen(function* () {
-              const member = yield* db.queryFirst(
-                MemberRow,
-                "SELECT user_id AS userId, joined_at AS joinedAt FROM members WHERE user_id = ?",
-                payload.author,
-              );
+              const member = yield* db.queryFirst({
+                schema: MemberRow,
+                sql: "SELECT user_id AS userId, joined_at AS joinedAt FROM members WHERE user_id = ?",
+                values: [payload.author],
+              });
               if (Option.isNone(member)) {
                 return yield* Effect.fail(
                   new NotAMember({ chatId: params.chatId, userId: payload.author }),
                 );
               }
               const now = yield* Clock.currentTimeMillis;
-              return yield* db.queryOne(
-                Message,
-                `INSERT INTO messages (id, author, body, created_at) VALUES (?, ?, ?, ?)
-                 RETURNING id, author, body, created_at AS createdAt`,
-                MessageId.make(crypto.randomUUID()),
-                payload.author,
-                payload.body,
-                now,
-              );
+              return yield* db.queryOne({
+                schema: Message,
+                sql: `INSERT INTO messages (id, author, body, created_at) VALUES (?, ?, ?, ?)
+                      RETURNING id, author, body, created_at AS createdAt`,
+                values: [MessageId.make(crypto.randomUUID()), payload.author, payload.body, now],
+              });
             }),
         }),
       );
@@ -117,29 +113,27 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
           Layer.provide(HttpServer.layerServices),
           HttpRouter.toHttpEffect,
         ),
-        create: Effect.fn("ChatRoom.create")(function* (
-          id: ChatId,
-          title: string,
-          creator: UserId,
-        ) {
+        create: Effect.fn("ChatRoom.create")(function* (chat: {
+          readonly id: ChatId;
+          readonly title: string;
+          readonly creator: UserId;
+        }) {
           const now = yield* Clock.currentTimeMillis;
-          const chat = yield* db.queryOne(
-            ChatRow,
-            `INSERT INTO chat (id, title, created_at) VALUES (?, ?, ?)
-             RETURNING id, title, created_at AS createdAt`,
-            id,
-            title,
-            now,
-          );
-          return yield* addMember(chat.id, chat.title, creator);
+          const row = yield* db.queryOne({
+            schema: ChatRow,
+            sql: `INSERT INTO chat (id, title, created_at) VALUES (?, ?, ?)
+                  RETURNING id, title, created_at AS createdAt`,
+            values: [chat.id, chat.title, now],
+          });
+          return yield* addMember({ chatId: row.id, title: row.title, userId: chat.creator });
         }),
         join: Effect.fn("ChatRoom.join")(function* (userId: UserId) {
-          const chat = yield* db.queryFirst(
-            ChatRow,
-            "SELECT id, title, created_at AS createdAt FROM chat",
-          );
+          const chat = yield* db.queryFirst({
+            schema: ChatRow,
+            sql: "SELECT id, title, created_at AS createdAt FROM chat",
+          });
           if (Option.isNone(chat)) return undefined;
-          return yield* addMember(chat.value.id, chat.value.title, userId);
+          return yield* addMember({ chatId: chat.value.id, title: chat.value.title, userId });
         }),
       };
     }).pipe(Effect.provide(ObjectDatabase.layer(chatMigrations))),

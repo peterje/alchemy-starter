@@ -24,29 +24,27 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
       // Creating or joining writes to two objects. The chat's write is authoritative and both
       // writes are idempotent, so a retry after a partial failure converges instead of diverging.
       const remember = (membership: Membership) =>
-        db.queryOne(
-          Membership,
-          `INSERT INTO memberships (chat_id, title, joined_at) VALUES (?, ?, ?)
-           ON CONFLICT (chat_id) DO UPDATE SET title = excluded.title
-           RETURNING chat_id AS chatId, title, joined_at AS joinedAt`,
-          membership.chatId,
-          membership.title,
-          membership.joinedAt,
-        );
+        db.queryOne({
+          schema: Membership,
+          sql: `INSERT INTO memberships (chat_id, title, joined_at) VALUES (?, ?, ?)
+                ON CONFLICT (chat_id) DO UPDATE SET title = excluded.title
+                RETURNING chat_id AS chatId, title, joined_at AS joinedAt`,
+          values: [membership.chatId, membership.title, membership.joinedAt],
+        });
 
       const handlers = HttpApiBuilder.group(UserApi, "memberships", (handlers) =>
         handlers.handleAll({
           list: () =>
-            db.query(
-              Schema.Array(Membership),
-              "SELECT chat_id AS chatId, title, joined_at AS joinedAt FROM memberships ORDER BY joined_at DESC, chat_id ASC",
-            ),
+            db.query({
+              schema: Schema.Array(Membership),
+              sql: "SELECT chat_id AS chatId, title, joined_at AS joinedAt FROM memberships ORDER BY joined_at DESC, chat_id ASC",
+            }),
           create: ({ params, payload }) =>
             Effect.gen(function* () {
               const id = ChatId.make(crypto.randomUUID());
               const membership = yield* rooms
                 .getByName(id)
-                .create(id, payload.title, params.userId);
+                .create({ id, title: payload.title, creator: params.userId });
               return yield* remember(membership);
             }),
           join: ({ params }) =>

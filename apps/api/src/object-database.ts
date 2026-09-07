@@ -2,6 +2,12 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import type { RuntimeContext } from "alchemy/RuntimeContext";
 import { Array, Context, Effect, Layer, Option, Schema } from "effect";
 
+interface Statement<Rows> {
+  readonly schema: Rows;
+  readonly sql: string;
+  readonly values?: ReadonlyArray<string | number>;
+}
+
 /**
  * The SQLite database inside the Durable Object that provides it. Storage failures are
  * defects: the Worker's HTTP boundary logs them and answers 500.
@@ -10,20 +16,14 @@ export class ObjectDatabase extends Context.Service<
   ObjectDatabase,
   {
     readonly query: <Row>(
-      rows: Schema.ConstraintDecoder<ReadonlyArray<Row>>,
-      statement: string,
-      ...bindings: ReadonlyArray<string | number>
+      statement: Statement<Schema.ConstraintDecoder<ReadonlyArray<Row>>>,
     ) => Effect.Effect<ReadonlyArray<Row>, never, RuntimeContext>;
     readonly queryFirst: <Row>(
-      row: Schema.ConstraintDecoder<Row>,
-      statement: string,
-      ...bindings: ReadonlyArray<string | number>
+      statement: Statement<Schema.ConstraintDecoder<Row>>,
     ) => Effect.Effect<Option.Option<Row>, never, RuntimeContext>;
     /** For statements that return exactly one row, such as `INSERT ... RETURNING`. */
     readonly queryOne: <Row>(
-      row: Schema.ConstraintDecoder<Row>,
-      statement: string,
-      ...bindings: ReadonlyArray<string | number>
+      statement: Statement<Schema.ConstraintDecoder<Row>>,
     ) => Effect.Effect<Row, never, RuntimeContext>;
   }
 >()("ObjectDatabase") {
@@ -43,24 +43,24 @@ export class ObjectDatabase extends Context.Service<
           storage.kv.put("schemaVersion", migrations.length);
         });
 
-        const query = <Row>(
-          rows: Schema.ConstraintDecoder<ReadonlyArray<Row>>,
-          statement: string,
-          ...bindings: ReadonlyArray<string | number>
-        ) =>
-          state.storage.sql.exec(statement, ...bindings).pipe(
+        const query = <Row>({
+          schema,
+          sql,
+          values = [],
+        }: Statement<Schema.ConstraintDecoder<ReadonlyArray<Row>>>) =>
+          state.storage.sql.exec(sql, ...values).pipe(
             Effect.flatMap((cursor) => cursor.toArray()),
-            Effect.flatMap(Schema.decodeUnknownEffect(rows)),
+            Effect.flatMap(Schema.decodeUnknownEffect(schema)),
             Effect.orDie,
           );
         return ObjectDatabase.of({
           query,
-          queryFirst: (row, statement, ...bindings) =>
-            Effect.map(query(Schema.Array(row), statement, ...bindings), Array.head),
-          queryOne: (row, statement, ...bindings) =>
-            state.storage.sql.exec(statement, ...bindings).pipe(
+          queryFirst: ({ schema, sql, values }) =>
+            Effect.map(query({ schema: Schema.Array(schema), sql, values }), Array.head),
+          queryOne: ({ schema, sql, values = [] }) =>
+            state.storage.sql.exec(sql, ...values).pipe(
               Effect.flatMap((cursor) => cursor.one()),
-              Effect.flatMap(Schema.decodeUnknownEffect(row)),
+              Effect.flatMap(Schema.decodeUnknownEffect(schema)),
               Effect.orDie,
             ),
         });
