@@ -18,7 +18,7 @@
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "bun --bun oxlint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.bun.json",
     "test:plugins": "node --experimental-strip-types --test packages/oxlint-plugins/*.rule.ts",
     "test:integration": "bun test test/chats.test.ts",
     "test:browser": "playwright test",

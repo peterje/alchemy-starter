@@ -14,14 +14,7 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "types": ["bun", "vite/client", "@cloudflare/workers-types"]
+    "types": ["vite/client", "@cloudflare/workers-types"]
   },
-  "include": [
-    "*.ts",
-    "apps/**/*.ts",
-    "apps/**/*.tsx",
-    "packages/**/*.ts",
-    "stacks/**/*.ts",
-    "test/**/*.ts"
-  ]
+  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/contract/**/*.ts", "alchemy.run.ts"]
 }
