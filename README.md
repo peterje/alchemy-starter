@@ -26,11 +26,11 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | `alchemy.run.ts`                            | Deploy the API Worker and the TanStack Start website                |
 | `packages/contract/src/user.ts`             | The user ID that selects an object                                  |
 | `packages/contract/src/chats.ts`            | The chats feature: schemas, branded IDs, errors, and two API groups |
-| `packages/contract/src/api.ts`              | Which object serves which group, and the union the browser sees     |
-| `apps/api/src/chat-room.ts`                 | One Durable Object per chat: members, messages, and its API         |
-| `apps/api/src/user-store.ts`                | One Durable Object per user: their memberships and its API          |
+| `packages/contract/src/api.ts`              | The HttpApi that composes every feature group                       |
+| `apps/api/src/chat-room.ts`                 | One Durable Object per chat: its members, messages, and RPC methods |
+| `apps/api/src/user-store.ts`                | One Durable Object per user: their memberships and RPC methods      |
 | `apps/api/src/object-database.ts`           | Service for an object's own SQLite: migrations and decoded queries  |
-| `apps/api/src/worker.ts`                    | The Worker that validates the path ID and routes to an object       |
+| `apps/api/src/worker.ts`                    | The Worker that serves the API by calling the objects' methods      |
 | `apps/website/src/atoms.ts`                 | The AtomHttpApi client and demo user atom shared by every route     |
 | `apps/website/src/routes/index.tsx`         | A user's chats and the create form                                  |
 | `apps/website/src/routes/chats.$chatId.tsx` | One chat: members, messages, join, and send                         |
@@ -45,9 +45,9 @@ The workspace is split by runtime. `packages/contract` runs everywhere and depen
 
 `ChatRoom` is one object per chat. It is the single writer for that chat's members and messages, so concurrent posts serialize without locks and membership checks read consistent state. `UserStore` is one object per user and holds only an index of memberships, which is what makes "each user has many chats" answerable without a global table.
 
-Creating or joining a chat writes to both. The chat's write is authoritative and both writes are idempotent, so a retry after a partial failure converges. The user's object calls the chat's object through Alchemy's typed stub; those RPC methods return plain values, and typed HTTP errors are raised by whichever object serves the request.
+Creating or joining a chat writes to both. The chat's write is authoritative and both writes are idempotent, so a retry after a partial failure converges. The user's object calls the chat's object through Alchemy's typed stub.
 
-Each object serves its own `HttpApi` because Effect requires every group of an API to be handled by one server. `api.ts` names that topology: a user API, a chat API, and the union the browser and tests use. The Worker validates the ID in the path and forwards `/api/users/:userId/*` and `/api/chats/:chatId/*` to the matching object.
+Objects expose RPC methods only, which is what Cloudflare recommends over `fetch` handlers. The Worker serves the whole `HttpApi` and implements each endpoint by calling a method on the right object; validation, status codes, and error encoding happen once, in the Worker. A typed failure raised inside an object crosses the stub as a plain tagged object, so the Worker decodes it back through its schema before the API encodes it.
 
 The website keeps the standard TanStack Start flow: SSR, file routes, and same-origin `/api`. `routes/api.$.ts` reads `env.API` and forwards to the API Worker through a service binding. That framework adapter is the only runtime `cloudflare:workers` import. The API Worker has no public workers.dev endpoint, and the browser needs no API URL or CORS configuration.
 

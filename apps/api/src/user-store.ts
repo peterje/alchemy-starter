@@ -1,9 +1,7 @@
-import { UserApi } from "@starter/contract/api";
-import { ChatId, ChatNotFound, Membership } from "@starter/contract/chats";
+import { ChatId, type ChatInput, Membership } from "@starter/contract/chats";
+import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
-import { Effect, Layer, Schema } from "effect";
-import { HttpRouter, HttpServer } from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { Effect, Schema } from "effect";
 
 import ChatRoom from "./chat-room.ts";
 import { ObjectDatabase } from "./object-database.ts";
@@ -19,7 +17,10 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
   Effect.gen(function* () {
     const rooms = yield* ChatRoom;
     return Effect.gen(function* () {
+      const state = yield* Cloudflare.DurableObjectState;
       const db = yield* ObjectDatabase;
+      // Objects are addressed by user ID, so the object's name is its ID.
+      const userId = Schema.decodeUnknownSync(UserId)(state.id.name);
 
       // Creating or joining writes to two objects. The chat's write is authoritative and both
       // writes are idempotent, so a retry after a partial failure converges instead of diverging.
@@ -32,38 +33,23 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
           values: [membership.chatId, membership.title, membership.joinedAt],
         });
 
-      const handlers = HttpApiBuilder.group(UserApi, "memberships", (handlers) =>
-        handlers.handleAll({
-          list: () =>
-            db.query({
-              schema: Schema.Array(Membership),
-              sql: "SELECT chat_id AS chatId, title, joined_at AS joinedAt FROM memberships ORDER BY joined_at DESC, chat_id ASC",
-            }),
-          create: ({ params, payload }) =>
-            Effect.gen(function* () {
-              const id = ChatId.make(crypto.randomUUID());
-              const membership = yield* rooms
-                .getByName(id)
-                .create({ id, title: payload.title, creator: params.userId });
-              return yield* remember(membership);
-            }),
-          join: ({ params }) =>
-            Effect.gen(function* () {
-              const membership = yield* rooms.getByName(params.chatId).join(params.userId);
-              if (membership === undefined) {
-                return yield* Effect.fail(new ChatNotFound({ id: params.chatId }));
-              }
-              return yield* remember(membership);
-            }),
-        }),
-      );
-
       return {
-        fetch: HttpApiBuilder.layer(UserApi).pipe(
-          Layer.provide(handlers),
-          Layer.provide(HttpServer.layerServices),
-          HttpRouter.toHttpEffect,
-        ),
+        list: () =>
+          db.query({
+            schema: Schema.Array(Membership),
+            sql: "SELECT chat_id AS chatId, title, joined_at AS joinedAt FROM memberships ORDER BY joined_at DESC, chat_id ASC",
+          }),
+        create: Effect.fn("UserStore.create")(function* (input: ChatInput) {
+          const chatId = ChatId.make(crypto.randomUUID());
+          const membership = yield* rooms
+            .getByName(chatId)
+            .create({ title: input.title, creator: userId });
+          return yield* remember(membership);
+        }),
+        join: Effect.fn("UserStore.join")(function* (chatId: ChatId) {
+          const membership = yield* rooms.getByName(chatId).join(userId);
+          return yield* remember(membership);
+        }),
       };
     }).pipe(Effect.provide(ObjectDatabase.layer(userMigrations)));
   }),

@@ -61,7 +61,7 @@ export class NotAMember extends Schema.TaggedError<NotAMember>()(
 /** Keep the demo response bounded; introduce pagination for longer histories. */
 export const messageListLimit = 100;
 
-/** Served by the user's object: the chats a user belongs to. */
+/** Backed by the user's object: the chats a user belongs to. */
 export class MembershipsGroup extends HttpApiGroup.make("memberships")
   .add(
     HttpApiEndpoint.get("list", "/", {
@@ -81,7 +81,7 @@ export class MembershipsGroup extends HttpApiGroup.make("memberships")
   )
   .prefix("/users/:userId/chats") {}
 
-/** Served by the chat's object: one chat, its members, and its messages. */
+/** Backed by the chat's object: one chat, its members, and its messages. */
 export class ChatGroup extends HttpApiGroup.make("chat")
   .add(
     HttpApiEndpoint.get("get", "/", {
