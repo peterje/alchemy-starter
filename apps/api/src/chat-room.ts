@@ -40,7 +40,7 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
   // No bindings to resolve in the isolate phase; each instance provides its own database.
   Effect.succeed(
     Effect.gen(function* () {
-      const { query, queryFirst, queryOne } = yield* ObjectDatabase;
+      const db = yield* ObjectDatabase;
 
       // Joining twice returns the original membership, so callers can retry safely.
       const addMember = Effect.fn("ChatRoom.addMember")(function* (
@@ -49,7 +49,7 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
         userId: UserId,
       ) {
         const now = yield* Clock.currentTimeMillis;
-        const member = yield* queryOne(
+        const member = yield* db.queryOne(
           MemberRow,
           `INSERT INTO members (user_id, joined_at) VALUES (?, ?)
            ON CONFLICT (user_id) DO UPDATE SET joined_at = joined_at
@@ -64,39 +64,42 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
         handlers.handleAll({
           get: ({ params }) =>
             Effect.gen(function* () {
-              const chat = yield* queryFirst(
-                ChatRow,
-                "SELECT id, title, created_at AS createdAt FROM chat",
-              ).pipe(
-                Effect.flatMap(Effect.fromOption(() => new ChatNotFound({ id: params.chatId }))),
-              );
-              const members = yield* query(
+              const chat = yield* db
+                .queryFirst(ChatRow, "SELECT id, title, created_at AS createdAt FROM chat")
+                .pipe(
+                  Effect.flatMap(Effect.fromOption(() => new ChatNotFound({ id: params.chatId }))),
+                );
+              const members = yield* db.query(
                 Schema.Array(MemberRow),
                 "SELECT user_id AS userId, joined_at AS joinedAt FROM members ORDER BY joined_at ASC, user_id ASC",
               );
               return { ...chat, members: members.map((member) => member.userId) };
             }),
           messages: () =>
-            query(
-              Schema.Array(Message),
-              `SELECT id, author, body, created_at AS createdAt FROM messages
+            db
+              .query(
+                Schema.Array(Message),
+                `SELECT id, author, body, created_at AS createdAt FROM messages
                ORDER BY created_at DESC, id DESC LIMIT ${messageListLimit}`,
-            ).pipe(Effect.map(Array.reverse)),
+              )
+              .pipe(Effect.map(Array.reverse)),
           post: ({ params, payload }) =>
             Effect.gen(function* () {
-              yield* queryFirst(
-                MemberRow,
-                "SELECT user_id AS userId, joined_at AS joinedAt FROM members WHERE user_id = ?",
-                payload.author,
-              ).pipe(
-                Effect.flatMap(
-                  Effect.fromOption(
-                    () => new NotAMember({ chatId: params.chatId, userId: payload.author }),
+              yield* db
+                .queryFirst(
+                  MemberRow,
+                  "SELECT user_id AS userId, joined_at AS joinedAt FROM members WHERE user_id = ?",
+                  payload.author,
+                )
+                .pipe(
+                  Effect.flatMap(
+                    Effect.fromOption(
+                      () => new NotAMember({ chatId: params.chatId, userId: payload.author }),
+                    ),
                   ),
-                ),
-              );
+                );
               const now = yield* Clock.currentTimeMillis;
-              return yield* queryOne(
+              return yield* db.queryOne(
                 Message,
                 `INSERT INTO messages (id, author, body, created_at) VALUES (?, ?, ?, ?)
                  RETURNING id, author, body, created_at AS createdAt`,
@@ -121,7 +124,7 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
           creator: UserId,
         ) {
           const now = yield* Clock.currentTimeMillis;
-          const chat = yield* queryOne(
+          const chat = yield* db.queryOne(
             ChatRow,
             `INSERT INTO chat (id, title, created_at) VALUES (?, ?, ?)
              RETURNING id, title, created_at AS createdAt`,
@@ -132,7 +135,7 @@ export default class ChatRoom extends Cloudflare.DurableObject<ChatRoom>()(
           return yield* addMember(chat.id, chat.title, creator);
         }),
         join: Effect.fn("ChatRoom.join")(function* (userId: UserId) {
-          const chat = yield* queryFirst(
+          const chat = yield* db.queryFirst(
             ChatRow,
             "SELECT id, title, created_at AS createdAt FROM chat",
           );
