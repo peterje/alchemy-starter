@@ -55,8 +55,8 @@ export class ObjectDatabase extends Context.Service<
           );
         return ObjectDatabase.of({
           query,
-          queryFirst: ({ schema, sql, values }) =>
-            Effect.map(query({ schema: Schema.Array(schema), sql, values }), Array.head),
+          queryFirst: (statement) =>
+            Effect.map(query({ ...statement, schema: Schema.Array(statement.schema) }), Array.head),
           queryOne: ({ schema, sql, values = [] }) =>
             state.storage.sql.exec(sql, ...values).pipe(
               Effect.flatMap((cursor) => cursor.one()),
