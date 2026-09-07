@@ -47,7 +47,7 @@ The workspace is split by runtime. `packages/contract` runs everywhere and depen
 
 Creating or joining a chat writes to both. The chat's write is authoritative and both writes are idempotent, so a retry after a partial failure converges. The user's object calls the chat's object through Alchemy's typed stub.
 
-Objects expose RPC methods only, which is what Cloudflare recommends over `fetch` handlers. The Worker serves the whole `HttpApi` and implements each endpoint by calling a method on the right object; validation, status codes, and error encoding happen once, in the Worker. A typed failure raised inside an object crosses the stub as a plain tagged object, so the Worker decodes it back through its schema before the API encodes it.
+Objects expose RPC methods only, which is what Cloudflare recommends over `fetch` handlers. The Worker serves the whole `HttpApi` and implements each endpoint by calling a method on the right object; validation, status codes, and error encoding happen once, in the Worker. A typed failure raised inside an object crosses the stub as a plain tagged object, so each Worker handler catches the tag and rebuilds the class before the API encodes it.
 
 The website keeps the standard TanStack Start flow: SSR, file routes, and same-origin `/api`. `routes/api.$.ts` reads `env.API` and forwards to the API Worker through a service binding. That framework adapter is the only runtime `cloudflare:workers` import. The API Worker has no public workers.dev endpoint, and the browser needs no API URL or CORS configuration.
 
