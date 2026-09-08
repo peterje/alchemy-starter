@@ -18,10 +18,9 @@ export default class DeckObject extends Cloudflare.DurableObject<DeckObject>()(
   Effect.succeed(
     Effect.gen(function* () {
       const state = yield* Cloudflare.DurableObjectState;
-      const db = yield* ObjectDatabase;
       // Objects are addressed by deck ID, so the object's name is its ID.
       const id = Schema.decodeUnknownSync(DeckId)(state.id.name);
-      const store = openVersionedStore(db, DeckFile);
+      const store = yield* openVersionedStore(DeckFile);
 
       return {
         get: Effect.fn("DeckObject.get")(function* () {

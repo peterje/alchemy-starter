@@ -18,10 +18,9 @@ export default class DocumentObject extends Cloudflare.DurableObject<DocumentObj
   Effect.succeed(
     Effect.gen(function* () {
       const state = yield* Cloudflare.DurableObjectState;
-      const db = yield* ObjectDatabase;
       // Objects are addressed by document ID, so the object's name is its ID.
       const id = Schema.decodeUnknownSync(DocumentId)(state.id.name);
-      const store = openVersionedStore(db, DocumentFile);
+      const store = yield* openVersionedStore(DocumentFile);
 
       return {
         get: Effect.fn("DocumentObject.get")(function* () {

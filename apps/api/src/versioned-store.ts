@@ -1,7 +1,7 @@
 import { Revision, Version } from "@starter/contract/versioning";
 import { Clock, Effect, Option, Schema } from "effect";
 
-import type { ObjectDatabase } from "./object-database.ts";
+import { ObjectDatabase } from "./object-database.ts";
 import {
   applyItemOperation,
   type ItemOperation,
@@ -29,15 +29,16 @@ const ItemRow = Schema.Struct({ version: Version, item: Schema.String });
 const ResultRow = Schema.Struct({ result: Schema.String });
 
 /** Persistence for one versioned file in the object's database. JSON columns decode through the file's schemas. */
-export const openVersionedStore = <Meta, Item extends { readonly id: string }>(
-  db: typeof ObjectDatabase.Service,
-  file: {
-    readonly Meta: Schema.ConstraintDecoder<Meta>;
-    readonly Item: Schema.ConstraintDecoder<Item>;
-    readonly Result: Schema.ConstraintDecoder<ItemOperationResult<Item>>;
-  },
-) => {
+export const openVersionedStore = Effect.fn("openVersionedStore")(function* <
+  Meta,
+  Item extends { readonly id: string },
+>(file: {
+  readonly Meta: Schema.ConstraintDecoder<Meta>;
+  readonly Item: Schema.ConstraintDecoder<Item>;
+  readonly Result: Schema.ConstraintDecoder<ItemOperationResult<Item>>;
+}) {
   type State = VersionedState<Meta, Item>;
+  const db = yield* ObjectDatabase;
   const decodeMeta = Schema.decodeUnknownSync(Schema.fromJsonString(file.Meta));
   const decodeItem = Schema.decodeUnknownSync(Schema.fromJsonString(file.Item));
   const decodeResult = Schema.decodeUnknownSync(Schema.fromJsonString(file.Result));
@@ -123,4 +124,4 @@ export const openVersionedStore = <Meta, Item extends { readonly id: string }>(
         return Option.some(outcome.result);
       }),
   };
-};
+});
