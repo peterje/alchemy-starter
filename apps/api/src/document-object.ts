@@ -8,8 +8,12 @@ import {
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Effect, Option, Schema } from "effect";
 
-import { ObjectDatabase } from "./object-database.ts";
-import { openVersionedStore, versionedMigrations } from "./versioned-store.ts";
+import * as VersionedStore from "./versioned-store.ts";
+
+class DocumentStore extends VersionedStore.Service<DocumentStore>()(
+  "DocumentStore",
+  DocumentFile,
+) {}
 
 /** One object per document: the single writer for its blocks and its operation log. */
 export default class DocumentObject extends Cloudflare.DurableObject<DocumentObject>()(
@@ -20,7 +24,7 @@ export default class DocumentObject extends Cloudflare.DurableObject<DocumentObj
       const state = yield* Cloudflare.DurableObjectState;
       // Objects are addressed by document ID, so the object's name is its ID.
       const id = Schema.decodeUnknownSync(DocumentId)(state.id.name);
-      const store = yield* openVersionedStore(DocumentFile);
+      const store = yield* DocumentStore;
 
       return {
         get: Effect.fn("DocumentObject.get")(function* () {
@@ -35,6 +39,6 @@ export default class DocumentObject extends Cloudflare.DurableObject<DocumentObj
           return result.value;
         }),
       };
-    }).pipe(Effect.provide(ObjectDatabase.layer(versionedMigrations))),
+    }).pipe(Effect.provide(DocumentStore.layer)),
   ),
 ) {}

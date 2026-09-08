@@ -34,7 +34,7 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | `apps/api/src/chat-room.ts`                         | One Durable Object per chat: its members, messages, and RPC methods  |
 | `apps/api/src/user-store.ts`                        | One Durable Object per user: their memberships, files, and RPC       |
 | `apps/api/src/versioned.ts`                         | The pure versioning core: apply an operation to a file's state       |
-| `apps/api/src/versioned-store.ts`                   | SQLite persistence for a versioned file and its replay log           |
+| `apps/api/src/versioned-store.ts`                   | The store service for a versioned file kind and its replay log       |
 | `apps/api/src/document-object.ts`                   | One Durable Object per document                                      |
 | `apps/api/src/deck-object.ts`                       | One Durable Object per slide deck                                    |
 | `apps/api/src/object-database.ts`                   | Service for an object's own SQLite: migrations and decoded queries   |
@@ -55,7 +55,7 @@ The workspace is split by runtime. `packages/contract` runs everywhere and depen
 
 ## Versioned files
 
-A document is page settings plus an ordered list of blocks; a deck is a title plus slides. Both are versioned files: every item carries the version it was last written at, and the file carries a revision. An operation upserts and deletes items against the versions the writer read and applies each one independently, so a stale block comes back as a conflict with the winner while the rest land. Metadata and order are last-writer-wins. Replaying an operation ID returns its original result. `versioning.ts` derives the state, operation, and result schemas of a file kind from its metadata and item schemas, and `versioned-store.ts` persists any such file in an object's SQLite with one row per item.
+A document is page settings plus an ordered list of blocks; a deck is a title plus slides. Both are versioned files: every item carries the version it was last written at, and the file carries a revision. An operation upserts and deletes items against the versions the writer read and applies each one independently, so a stale block comes back as a conflict with the winner while the rest land. Metadata and order are last-writer-wins. Replaying an operation ID returns its original result. `versioning.ts` derives the state, operation, and result schemas of a file kind from its metadata and item schemas, and `versioned-store.ts` declares a store service for any such file kind that persists it in an object's SQLite with one row per item.
 
 ## Why three kinds of object
 

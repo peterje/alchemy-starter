@@ -8,8 +8,9 @@ import {
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Effect, Option, Schema } from "effect";
 
-import { ObjectDatabase } from "./object-database.ts";
-import { openVersionedStore, versionedMigrations } from "./versioned-store.ts";
+import * as VersionedStore from "./versioned-store.ts";
+
+class DeckStore extends VersionedStore.Service<DeckStore>()("DeckStore", DeckFile) {}
 
 /** One object per deck: the single writer for its slides and its operation log. */
 export default class DeckObject extends Cloudflare.DurableObject<DeckObject>()(
@@ -20,7 +21,7 @@ export default class DeckObject extends Cloudflare.DurableObject<DeckObject>()(
       const state = yield* Cloudflare.DurableObjectState;
       // Objects are addressed by deck ID, so the object's name is its ID.
       const id = Schema.decodeUnknownSync(DeckId)(state.id.name);
-      const store = yield* openVersionedStore(DeckFile);
+      const store = yield* DeckStore;
 
       return {
         get: Effect.fn("DeckObject.get")(function* () {
@@ -35,6 +36,6 @@ export default class DeckObject extends Cloudflare.DurableObject<DeckObject>()(
           return result.value;
         }),
       };
-    }).pipe(Effect.provide(ObjectDatabase.layer(versionedMigrations))),
+    }).pipe(Effect.provide(DeckStore.layer)),
   ),
 ) {}
