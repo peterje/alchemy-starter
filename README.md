@@ -1,10 +1,10 @@
 # Alchemy starter
 
-A small demo with **Effect, Alchemy, and TanStack Start**. Each chat, document, and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the chats they belong to and the files they created. No ORM, repository adapters, or mock storage.
+A small demo with **Effect, Alchemy, and TanStack Start**. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
 
-The UI switches between Alice and Bob, creates chats, joins them by URL, posts messages, and edits documents and decks block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
+The UI switches between Alice and Bob, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
 
-**This is a public demo, not an authenticated app.** The selected user ID controls routing and names the author of a message. Before storing private data, authenticate requests and take the user from the verified session instead of the client.
+**This is a public demo, not an authenticated app.** The selected user ID controls routing. Before storing private data, authenticate requests and take the user from the verified session instead of the client.
 
 ## Run
 
@@ -25,23 +25,19 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | --------------------------------------------------- | -------------------------------------------------------------------- |
 | `alchemy.run.ts`                                    | Deploy the API Worker and the TanStack Start website                 |
 | `packages/contract/src/user.ts`                     | The user ID that selects an object                                   |
-| `packages/contract/src/chats.ts`                    | The chats feature: schemas, branded IDs, errors, and two API groups  |
 | `packages/contract/src/versioning.ts`               | Versioned files: items with versions, revisions, operations, results |
 | `packages/contract/src/documents.ts`                | The document model: page settings, blocks, and its API group         |
 | `packages/contract/src/slides.ts`                   | The slide deck model on the same versioning core, and its group      |
 | `packages/contract/src/files.ts`                    | A user's file pointers and the group that creates and lists them     |
 | `packages/contract/src/api.ts`                      | The HttpApi that composes every feature group                        |
-| `apps/api/src/chat-room.ts`                         | One Durable Object per chat: its members, messages, and RPC methods  |
-| `apps/api/src/user-store.ts`                        | One Durable Object per user: their memberships, files, and RPC       |
+| `apps/api/src/user-store.ts`                        | One Durable Object per user: the index of their files                |
 | `apps/api/src/versioned.ts`                         | The pure versioning core: apply an operation to a file's state       |
 | `apps/api/src/document-object.ts`                   | One Durable Object per document                                      |
 | `apps/api/src/deck-object.ts`                       | One Durable Object per slide deck                                    |
 | `apps/api/src/object-database.ts`                   | Service for an object's own SQLite: migrations and decoded queries   |
 | `apps/api/src/worker.ts`                            | The Worker that serves the API by calling the objects' methods       |
 | `apps/website/src/atoms.ts`                         | The AtomHttpApi client and demo user atom shared by every route      |
-| `apps/website/src/routes/index.tsx`                 | A user's chats and the create form                                   |
-| `apps/website/src/routes/chats.$chatId.tsx`         | One chat: members, messages, join, and send                          |
-| `apps/website/src/routes/files.tsx`                 | A user's files, the create form, and the example starters            |
+| `apps/website/src/routes/index.tsx`                 | A user's files, the create form, and the example starters            |
 | `apps/website/src/routes/documents.$documentId.tsx` | One document: pages, rename, edit and add paragraphs                 |
 | `apps/website/src/routes/decks.$deckId.tsx`         | One deck: rename, add and delete slides                              |
 | `apps/website/src/blocks.tsx`                       | Block renderers shared by the measuring pass and the pages           |
@@ -53,8 +49,8 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | `apps/website/src/examples.ts`                      | Example files that exercise every block kind and slide layout        |
 | `apps/website/src/routes/__root.tsx`                | TanStack Start document and the demo user picker                     |
 | `apps/website/src/routes/api.$.ts`                  | Same-origin API route forwarding through an Alchemy service binding  |
-| `test/chats.test.ts`                                | Integration tests against actual Workers and Durable Objects         |
-| `test/browser/chats.pw.ts`                          | Playwright coverage of two users sharing one chat                    |
+| `test/files.test.ts`                                | Integration tests against actual Workers and Durable Objects         |
+| `test/browser/files.pw.ts`                          | Playwright coverage of creating, editing, and paginating files       |
 
 The workspace is split by runtime. `packages/contract` runs everywhere and depends on Effect only. `apps/api` runs in workerd and depends on the contract and Alchemy. `apps/website` runs in the browser and SSR and depends on the contract and TanStack. The website never imports `@starter/api`; the Vite build fails if it does.
 
@@ -62,11 +58,11 @@ The workspace is split by runtime. `packages/contract` runs everywhere and depen
 
 A document is page settings plus an ordered list of blocks; a deck is a title plus slides. Both are versioned files: every item carries the version it was last written at, and the file carries a revision. An operation upserts and deletes items against the versions the writer read and applies each one independently, so a stale block comes back as a conflict with the winner while the rest land. Metadata and order are last-writer-wins. Replaying an operation ID returns its original result. `versioning.ts` derives the state, operation, and result schemas of a file kind from its metadata and item schemas, `versioned.ts` applies an operation to a state, and each object persists its own file as one row in its SQLite next to its operation log.
 
-## Why three kinds of object
+## Why two kinds of object
 
-`ChatRoom` is one object per chat. It is the single writer for that chat's members and messages, so concurrent posts serialize without locks and membership checks read consistent state. `UserStore` is one object per user and holds only an index of memberships, which is what makes "each user has many chats" answerable without a global table.
+`DocumentObject` and `DeckObject` are one object per file. Each is the single writer for its content and its operation log, so concurrent edits serialize without locks and every conflict check reads consistent state. `UserStore` is one object per user and holds only an index of the files they created, which is what makes "each user has many files" answerable without a global table.
 
-Creating or joining a chat writes to both. The chat's write is authoritative and both writes are idempotent, so a retry after a partial failure converges. The user's object calls the chat's object through Alchemy's typed stub.
+Creating a file writes to both. The file's write is authoritative and the user's row is idempotent, so a retry after a partial failure converges. The user's object calls the file's object through Alchemy's typed stub.
 
 Objects expose RPC methods only, which is what Cloudflare recommends over `fetch` handlers. The Worker serves the whole `HttpApi` and implements each endpoint by calling a method on the right object; validation, status codes, and error encoding happen once, in the Worker. A typed failure raised inside an object crosses the stub as a plain tagged object, so each Worker handler catches the tag and rebuilds the class before the API encodes it.
 

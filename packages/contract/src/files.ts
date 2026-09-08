@@ -8,7 +8,7 @@ import { UserId } from "./user.ts";
 /**
  * A user's files: pointers to the document and deck objects they created.
  * The title is the one the file was created with; the file's object stays
- * authoritative, like a chat membership's title.
+ * authoritative.
  */
 export const FileRef = Schema.Union([
   Schema.Struct({

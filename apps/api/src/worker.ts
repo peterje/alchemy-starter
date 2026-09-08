@@ -1,5 +1,4 @@
 import { Api } from "@starter/contract/api";
-import { ChatNotFound, NotAMember } from "@starter/contract/chats";
 import { DocumentNotFound } from "@starter/contract/documents";
 import { DeckNotFound } from "@starter/contract/slides";
 import { InvalidOperation } from "@starter/contract/versioning";
@@ -8,7 +7,6 @@ import { Config, Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
-import ChatRoom from "./chat-room.ts";
 import DeckObject from "./deck-object.ts";
 import DocumentObject from "./document-object.ts";
 import UserStore from "./user-store.ts";
@@ -25,29 +23,13 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   },
   Effect.gen(function* () {
     const users = yield* UserStore;
-    const rooms = yield* ChatRoom;
     const documents = yield* DocumentObject;
     const decks = yield* DeckObject;
 
     // Demo routing only. Select the user's object from a verified session before storing private data.
-    const memberships = HttpApiBuilder.group(Api, "memberships", (handlers) =>
-      handlers.handleAll({
-        list: ({ params }) => users.getByName(params.userId).list(),
-        create: ({ params, payload }) => users.getByName(params.userId).create(payload),
-        join: ({ params }) =>
-          users
-            .getByName(params.userId)
-            .join(params.chatId)
-            .pipe(
-              Effect.catchTag("ChatNotFound", (error) =>
-                Effect.fail(new ChatNotFound({ id: error.id })),
-              ),
-            ),
-      }),
-    );
     const files = HttpApiBuilder.group(Api, "files", (handlers) =>
       handlers.handleAll({
-        list: ({ params }) => users.getByName(params.userId).listFiles(),
+        list: ({ params }) => users.getByName(params.userId).list(),
         createDocument: ({ params, payload }) =>
           users.getByName(params.userId).createDocument(payload),
         createDeck: ({ params, payload }) => users.getByName(params.userId).createDeck(payload),
@@ -109,33 +91,9 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
             ),
       }),
     );
-    const chat = HttpApiBuilder.group(Api, "chat", (handlers) =>
-      handlers.handleAll({
-        get: ({ params }) =>
-          rooms
-            .getByName(params.chatId)
-            .get()
-            .pipe(
-              Effect.catchTag("ChatNotFound", (error) =>
-                Effect.fail(new ChatNotFound({ id: error.id })),
-              ),
-            ),
-        messages: ({ params }) => rooms.getByName(params.chatId).messages(),
-        post: ({ params, payload }) =>
-          rooms
-            .getByName(params.chatId)
-            .post(payload)
-            .pipe(
-              Effect.catchTag("NotAMember", (error) =>
-                Effect.fail(new NotAMember({ chatId: error.chatId, userId: error.userId })),
-              ),
-            ),
-      }),
-    );
-
     return {
       fetch: HttpApiBuilder.layer(Api).pipe(
-        Layer.provide([memberships, files, chat, documentsGroup, decksGroup]),
+        Layer.provide([files, documentsGroup, decksGroup]),
         Layer.provide(HttpServer.layerServices),
         HttpRouter.toHttpEffect,
       ),
