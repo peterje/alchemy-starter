@@ -6,11 +6,18 @@ import {
   type DeckOperation,
 } from "@starter/contract/slides";
 import * as Cloudflare from "alchemy/Cloudflare";
-import { Effect, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 
+import { ObjectDatabase } from "./object-database.ts";
 import * as VersionedStore from "./versioned-store.ts";
 
-class DeckStore extends VersionedStore.Service<DeckStore>()("DeckStore", DeckFile) {}
+class DeckStore extends Context.Service<DeckStore>()("DeckStore", {
+  make: VersionedStore.make(DeckFile),
+}) {
+  static readonly layer = Layer.effect(this)(this.make).pipe(
+    Layer.provide(ObjectDatabase.layer(VersionedStore.migrations)),
+  );
+}
 
 /** One object per deck: the single writer for its slides and its operation log. */
 export default class DeckObject extends Cloudflare.DurableObject<DeckObject>()(
