@@ -29,6 +29,26 @@ export const defaultPageSettings: PageSettings = {
   margins: { top: 0.6, right: 0.6, bottom: 0.6, left: 0.6 },
 };
 
+/** Physical page dimensions in inches for each paper size. */
+const paperInches = {
+  letter: { width: 8.5, height: 11 },
+  a4: { width: 8.27, height: 11.69 },
+};
+
+/** Page settings resolved into the dimensions every renderer shares, in inches. */
+export const pageGeometry = (page: PageSettings) => {
+  const paper = paperInches[page.size];
+  const width = page.orientation === "portrait" ? paper.width : paper.height;
+  const height = page.orientation === "portrait" ? paper.height : paper.width;
+  return {
+    width,
+    height,
+    margins: page.margins,
+    contentWidth: width - page.margins.left - page.margins.right,
+    contentHeight: height - page.margins.top - page.margins.bottom,
+  };
+};
+
 const Latex = Schema.String.check(Schema.isMaxLength(5_000));
 
 export const TextInline = Schema.Struct({
@@ -44,14 +64,11 @@ export const TextInline = Schema.Struct({
 });
 export type TextInline = typeof TextInline.Type;
 
-/** Images are embedded PNG or JPEG data URLs, or https URLs. Data URLs stay under the per-row storage limit. */
-export const ImageSrc = Schema.Union([
-  Schema.String.check(
-    Schema.isPattern(/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+=*$/u),
-    Schema.isMaxLength(1_500_000),
-  ),
-  Schema.String.check(Schema.isPattern(/^https:\/\/[^\s"'<>]+$/u), Schema.isMaxLength(2_048)),
-]);
+/** Images are https URLs, never embedded bytes: a whole file is one row in its object's database. */
+export const ImageSrc = Schema.String.check(
+  Schema.isPattern(/^https:\/\/[^\s"'<>]+$/u),
+  Schema.isMaxLength(2_048),
+);
 export type ImageSrc = typeof ImageSrc.Type;
 
 export const Inline = Schema.Union([
@@ -130,7 +147,7 @@ export const TableRow = Schema.Struct({
 });
 export type TableRow = typeof TableRow.Type;
 
-const rowColumnCount = (row: TableRow): number =>
+export const rowColumnCount = (row: TableRow): number =>
   row.cells.reduce((total, cell) => total + (cell.colSpan ?? 1), 0);
 
 // Every row must cover the same number of grid columns so column widths are well defined.

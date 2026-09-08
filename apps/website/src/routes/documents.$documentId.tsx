@@ -1,5 +1,6 @@
 import { useAtom, useAtomSuspense } from "@effect/atom-react";
 import {
+  type Block,
   DocumentId,
   type DocumentOperation,
   type DocumentOperationResult,
@@ -12,7 +13,7 @@ import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { Suspense } from "react";
 
 import { client } from "../atoms.ts";
-import { Blocks } from "../blocks.tsx";
+import { DocumentPages } from "../document-pages.tsx";
 
 export const Route = createFileRoute("/documents/$documentId")({
   // A malformed ID fails here, and the route renders DocumentUnavailable instead of the page.
@@ -36,6 +37,13 @@ const noticeAtom = Atom.make("");
 const Text = Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(50_000)) });
 const paragraphText = (block: ParagraphBlock) =>
   block.inlines.map((inline) => (inline.type === "text" ? inline.text : "")).join("");
+const excerpt = (block: Block) =>
+  block.type === "paragraph" || block.type === "heading"
+    ? block.inlines
+        .map((inline) => (inline.type === "text" ? inline.text : ""))
+        .join("")
+        .slice(0, 60)
+    : "";
 const notice = (result: DocumentOperationResult) =>
   result.status === "applied"
     ? ""
@@ -106,84 +114,87 @@ function Document({ documentId }: Readonly<{ documentId: DocumentId }>) {
           {message}
         </p>
       )}
-      <article className="blocks" aria-label="Blocks">
-        {items.map(({ version, item }) => (
-          <div key={item.id}>
-            <Blocks blocks={[item]} />
-            {item.type === "paragraph" ? (
-              <details>
-                <summary>Edit paragraph</summary>
-                <form
-                  onSubmit={async (event) => {
-                    event.preventDefault();
-                    const form = event.currentTarget;
-                    const { text } = Schema.decodeUnknownSync(Text)(
-                      Object.fromEntries(new FormData(form)),
-                    );
-                    // The version the edit was based on; a stale one comes back as a conflict.
-                    const landed = await submit({
-                      upserts: [
-                        {
-                          baseVersion: version,
-                          item: { ...item, inlines: [{ type: "text", text }] },
-                        },
-                      ],
-                    });
-                    if (landed) form.closest("details")?.removeAttribute("open");
-                  }}
-                >
-                  <label htmlFor={`text-${item.id}`}>Text</label>
-                  <textarea
-                    id={`text-${item.id}`}
-                    name="text"
-                    defaultValue={paragraphText(item)}
-                    disabled={busy}
-                    rows={3}
-                    maxLength={50_000}
-                  />
-                  <button type="submit" disabled={busy}>
-                    Save paragraph
-                  </button>
-                </form>
-              </details>
-            ) : null}
-          </div>
-        ))}
-      </article>
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          const form = event.currentTarget;
-          const { text } = Schema.decodeUnknownSync(Text)(Object.fromEntries(new FormData(form)));
-          const landed = await submit({
-            upserts: [
-              {
-                baseVersion: 0,
-                item: {
-                  id: crypto.randomUUID(),
-                  type: "paragraph",
-                  inlines: [{ type: "text", text }],
+      <DocumentPages documentId={documentId} state={document.value} />
+      <section aria-label="Blocks">
+        <ol>
+          {items.map(({ version, item }) => (
+            <li key={item.id}>
+              <span className="hint">{item.type}</span> {excerpt(item)}
+              {item.type === "paragraph" ? (
+                <details>
+                  <summary>Edit paragraph</summary>
+                  <form
+                    onSubmit={async (event) => {
+                      event.preventDefault();
+                      const form = event.currentTarget;
+                      const { text } = Schema.decodeUnknownSync(Text)(
+                        Object.fromEntries(new FormData(form)),
+                      );
+                      // The version the edit was based on; a stale one comes back as a conflict.
+                      const landed = await submit({
+                        upserts: [
+                          {
+                            baseVersion: version,
+                            item: { ...item, inlines: [{ type: "text", text }] },
+                          },
+                        ],
+                      });
+                      if (landed) form.closest("details")?.removeAttribute("open");
+                    }}
+                  >
+                    <label htmlFor={`text-${item.id}`}>Text</label>
+                    <textarea
+                      id={`text-${item.id}`}
+                      name="text"
+                      defaultValue={paragraphText(item)}
+                      disabled={busy}
+                      rows={3}
+                      maxLength={50_000}
+                    />
+                    <button type="submit" disabled={busy}>
+                      Save paragraph
+                    </button>
+                  </form>
+                </details>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const { text } = Schema.decodeUnknownSync(Text)(Object.fromEntries(new FormData(form)));
+            const landed = await submit({
+              upserts: [
+                {
+                  baseVersion: 0,
+                  item: {
+                    id: crypto.randomUUID(),
+                    type: "paragraph",
+                    inlines: [{ type: "text", text }],
+                  },
                 },
-              },
-            ],
-          });
-          if (landed) form.reset();
-        }}
-      >
-        <label htmlFor="new-paragraph">New paragraph</label>
-        <textarea
-          id="new-paragraph"
-          name="text"
-          disabled={busy}
-          required
-          rows={3}
-          maxLength={50_000}
-          placeholder="Add a paragraph at the end"
-        />
-        <button type="submit" disabled={busy}>
-          Add paragraph
-        </button>
-      </form>
+              ],
+            });
+            if (landed) form.reset();
+          }}
+        >
+          <label htmlFor="new-paragraph">New paragraph</label>
+          <textarea
+            id="new-paragraph"
+            name="text"
+            disabled={busy}
+            required
+            rows={3}
+            maxLength={50_000}
+            placeholder="Add a paragraph at the end"
+          />
+          <button type="submit" disabled={busy}>
+            Add paragraph
+          </button>
+        </form>
+      </section>
     </section>
   );
 }

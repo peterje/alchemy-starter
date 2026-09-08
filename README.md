@@ -2,7 +2,7 @@
 
 A small demo with **Effect, Alchemy, and TanStack Start**. Each chat, document, and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the chats they belong to and the files they created. No ORM, repository adapters, or mock storage.
 
-The UI switches between Alice and Bob, creates chats, joins them by URL, posts messages, and edits documents and decks block by block. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
+The UI switches between Alice and Bob, creates chats, joins them by URL, posts messages, and edits documents and decks block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
 
 **This is a public demo, not an authenticated app.** The selected user ID controls routing and names the author of a message. Before storing private data, authenticate requests and take the user from the verified session instead of the client.
 
@@ -42,9 +42,14 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | `apps/website/src/routes/index.tsx`                 | A user's chats and the create form                                   |
 | `apps/website/src/routes/chats.$chatId.tsx`         | One chat: members, messages, join, and send                          |
 | `apps/website/src/routes/files.tsx`                 | A user's files and the create form                                   |
-| `apps/website/src/routes/documents.$documentId.tsx` | One document: rename, edit paragraphs, add paragraphs                |
+| `apps/website/src/routes/documents.$documentId.tsx` | One document: pages, rename, edit and add paragraphs                 |
 | `apps/website/src/routes/decks.$deckId.tsx`         | One deck: rename, add and delete slides                              |
-| `apps/website/src/blocks.tsx`                       | Read-only rendering of every block kind                              |
+| `apps/website/src/blocks.tsx`                       | Block renderers shared by the measuring pass and the pages           |
+| `apps/website/src/document-pages.tsx`               | The paginated, print-faithful document viewer                        |
+| `apps/website/src/document-layout.ts`               | Pure pagination over measured blocks                                 |
+| `apps/website/src/document-measure.ts`              | Reads block heights and break offsets from the offscreen copy        |
+| `apps/website/src/slide-deck.tsx`                   | Real-size 16:9 slides scaled to fit the screen                       |
+| `apps/website/src/math.ts`                          | LaTeX to KaTeX HTML                                                  |
 | `apps/website/src/routes/__root.tsx`                | TanStack Start document and the demo user picker                     |
 | `apps/website/src/routes/api.$.ts`                  | Same-origin API route forwarding through an Alchemy service binding  |
 | `test/chats.test.ts`                                | Integration tests against actual Workers and Durable Objects         |

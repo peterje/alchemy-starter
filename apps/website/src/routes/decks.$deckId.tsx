@@ -7,7 +7,7 @@ import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { Suspense } from "react";
 
 import { client } from "../atoms.ts";
-import { Blocks, Inlines } from "../blocks.tsx";
+import { Deck, SlideView } from "../slide-deck.tsx";
 
 export const Route = createFileRoute("/decks/$deckId")({
   // A malformed ID fails here, and the route renders DeckUnavailable instead of the page.
@@ -36,12 +36,12 @@ function DeckPage() {
   const { deckId } = Route.useParams();
   return (
     <Suspense fallback={<p role="status">Loading deck…</p>}>
-      <Deck deckId={deckId} />
+      <DeckView deckId={deckId} />
     </Suspense>
   );
 }
 
-function Deck({ deckId }: Readonly<{ deckId: DeckId }>) {
+function DeckView({ deckId }: Readonly<{ deckId: DeckId }>) {
   const hydrated = useHydrated();
   const deck = useAtomSuspense(deckAtom(deckId), { includeFailure: true });
   const [applied, apply] = useAtom(applyAtom, { mode: "promiseExit" });
@@ -94,35 +94,26 @@ function Deck({ deckId }: Readonly<{ deckId: DeckId }>) {
           {message}
         </p>
       )}
-      <ol className="slides" aria-label="Slides">
+      <Deck>
         {items.map(({ version, item }, index) => (
-          <li key={item.id}>
-            <article className={`slide ${item.layout}`} aria-label={`Slide ${index + 1}`}>
-              {item.title === undefined ? null : (
-                <h2>
-                  <Inlines inlines={item.title} />
-                </h2>
-              )}
-              {item.subtitle === undefined ? null : (
-                <p className="hint">
-                  <Inlines inlines={item.subtitle} />
-                </p>
-              )}
-              <Blocks blocks={item.body} />
-              {item.secondary === undefined ? null : <Blocks blocks={item.secondary} />}
-              {item.notes === undefined ? null : <p className="hint">Notes: {item.notes}</p>}
+          <figure key={item.id} className="deck-item" aria-label={`Slide ${index + 1}`}>
+            <div className="slide-frame">
+              <SlideView slide={item} />
+            </div>
+            <figcaption className="deck-caption">
+              <span className="deck-number">{index + 1}</span>
+              {item.notes === undefined ? null : <span className="deck-notes">{item.notes}</span>}
               <button
                 type="button"
-                className="delete"
                 disabled={busy}
                 onClick={() => submit({ deletes: [{ id: item.id, baseVersion: version }] })}
               >
                 Delete slide
               </button>
-            </article>
-          </li>
+            </figcaption>
+          </figure>
         ))}
-      </ol>
+      </Deck>
       <form
         onSubmit={async (event) => {
           event.preventDefault();

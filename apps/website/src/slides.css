@@ -1,0 +1,230 @@
+/* Slide decks: fixed 16:9 slides scaled to fit on screen, one per page in print. */
+
+.deck {
+  --slide-scale: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 1.5rem 0;
+}
+
+.deck-item {
+  margin: 0;
+  width: 100%;
+  max-width: 13.333in;
+}
+
+.slide-frame {
+  width: calc(13.333in * var(--slide-scale));
+  height: calc(7.5in * var(--slide-scale));
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.slide-frame .slide {
+  transform: scale(var(--slide-scale));
+  transform-origin: top left;
+}
+
+.deck-caption {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  width: calc(13.333in * var(--slide-scale));
+  color: #696965;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.deck-number {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.deck-notes {
+  flex: 1;
+  white-space: pre-wrap;
+}
+
+.deck-caption button {
+  margin-left: auto;
+}
+
+.slide {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  color: #111;
+  font-family: Arial, "Liberation Sans", sans-serif;
+  font-size: 20pt;
+  line-height: 1.3;
+}
+
+.slide-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.slide-heading {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.slide-band {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 0.15in;
+  margin-bottom: 0.3in;
+  border-bottom: 3px solid #166534;
+  font-size: 36pt;
+}
+
+.slide-title-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35in;
+  text-align: center;
+}
+
+.slide-title-layout .slide-heading {
+  font-size: 44pt;
+}
+
+.slide-subtitle {
+  margin: 0;
+  color: #374151;
+  font-size: 22pt;
+}
+
+.slide-columns {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+}
+
+.slide-content {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.slide-content .doc-block {
+  padding-bottom: 0.15in;
+}
+
+.slide-content p,
+.slide-content ul,
+.slide-content ol {
+  margin: 0;
+}
+
+/* The site sheet strips list markers and rules list items; slides keep them. */
+.slide-content ul,
+.slide-content ol {
+  padding-left: 0.5in;
+}
+
+.slide-content ul {
+  list-style: disc;
+}
+
+.slide-content ol {
+  list-style: decimal;
+}
+
+.slide-content li {
+  padding: 0 0 0.08in;
+  border: 0;
+}
+
+.slide-content table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 16pt;
+}
+
+.slide-content th,
+.slide-content td {
+  border: 1px solid #111;
+  padding: 0.08in 0.12in;
+  vertical-align: top;
+  text-align: left;
+}
+
+.slide-content th {
+  background: #efefef;
+  font-weight: 700;
+}
+
+.slide-content img {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.slide-content .doc-math-block .katex-display {
+  margin: 0;
+}
+
+.slide-content .doc-math .katex,
+.slide-content .doc-math-block .katex {
+  font-size: 1.1em;
+}
+
+.slide-overflow-badge {
+  position: absolute;
+  right: 0.25in;
+  bottom: 0.2in;
+  display: none;
+  border-radius: 0.3in;
+  background: #9f1239;
+  color: #fff;
+  padding: 0.08in 0.2in;
+  font-size: 12pt;
+  font-weight: 700;
+}
+
+.slide-overflow .slide-overflow-badge {
+  display: block;
+}
+
+@media print {
+  html,
+  body {
+    margin: 0;
+    background: #fff;
+  }
+
+  .deck-caption,
+  .slide-overflow-badge {
+    display: none !important;
+  }
+
+  .deck {
+    --slide-scale: 1 !important;
+    display: block;
+    padding: 0;
+  }
+
+  .deck-item {
+    max-width: none;
+    break-after: page;
+  }
+
+  .deck-item:last-child {
+    break-after: auto;
+  }
+
+  .slide-frame {
+    box-shadow: none;
+  }
+}

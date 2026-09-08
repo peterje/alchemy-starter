@@ -9,10 +9,12 @@
     "@tanstack/react-router": "1.167.4",
     "@tanstack/react-start": "1.166.15",
     "effect": "4.0.0-rc.110",
+    "katex": "0.18.5",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@types/katex": "0.16.8",
     "@vitejs/plugin-react": "6.0.2",
     "vite": "8.0.7"
   }
