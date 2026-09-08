@@ -13,6 +13,7 @@ import { AsyncResult } from "effect/unstable/reactivity";
 import { Suspense } from "react";
 
 import { client, userAtom } from "../atoms.ts";
+import { algebraWorksheet, geometryQuiz, linearEquationsLesson } from "../examples.ts";
 
 export const Route = createFileRoute("/files")({ component: FilesPage });
 
@@ -57,6 +58,24 @@ function Files() {
   const failed = AsyncResult.isFailure(createdDocument) || AsyncResult.isFailure(createdDeck);
   const busy = !hydrated || creating;
 
+  const keys = { files: [userId] };
+  const openDocument = async (document: Document) => {
+    const result = await createDocument({
+      params: { userId },
+      payload: document,
+      reactivityKeys: keys,
+    });
+    if (Exit.isSuccess(result) && result.value.kind === "document") {
+      await navigate({ to: "/documents/$documentId", params: { documentId: result.value.id } });
+    }
+  };
+  const openDeck = async (deck: Deck) => {
+    const result = await createDeck({ params: { userId }, payload: deck, reactivityKeys: keys });
+    if (Exit.isSuccess(result) && result.value.kind === "deck") {
+      await navigate({ to: "/decks/$deckId", params: { deckId: result.value.id } });
+    }
+  };
+
   return (
     <section key={userId} aria-label={`${userId}'s files`}>
       <form
@@ -66,33 +85,11 @@ function Files() {
           const input = Schema.decodeUnknownSync(NewFile)(
             Object.fromEntries(new FormData(event.currentTarget)),
           );
-          const keys = { files: [userId] };
           switch (input.kind) {
-            case "document": {
-              const result = await createDocument({
-                params: { userId },
-                payload: newDocument(input.title),
-                reactivityKeys: keys,
-              });
-              if (Exit.isSuccess(result) && result.value.kind === "document") {
-                await navigate({
-                  to: "/documents/$documentId",
-                  params: { documentId: result.value.id },
-                });
-              }
-              return;
-            }
-            case "deck": {
-              const result = await createDeck({
-                params: { userId },
-                payload: newDeck(input.title),
-                reactivityKeys: keys,
-              });
-              if (Exit.isSuccess(result) && result.value.kind === "deck") {
-                await navigate({ to: "/decks/$deckId", params: { deckId: result.value.id } });
-              }
-              return;
-            }
+            case "document":
+              return openDocument(newDocument(input.title));
+            case "deck":
+              return openDeck(newDeck(input.title));
             default: {
               const exhaustive: never = input.kind;
               return exhaustive;
@@ -119,6 +116,18 @@ function Files() {
           {creating ? "Creating…" : "Create file"}
         </button>
       </form>
+      <p className="hint">Or start from an example:</p>
+      <p className="examples">
+        <button type="button" disabled={busy} onClick={() => openDocument(algebraWorksheet)}>
+          Algebra worksheet
+        </button>
+        <button type="button" disabled={busy} onClick={() => openDocument(geometryQuiz)}>
+          Geometry quiz
+        </button>
+        <button type="button" disabled={busy} onClick={() => openDeck(linearEquationsLesson)}>
+          Lesson deck
+        </button>
+      </p>
       {failed ? (
         <p role="alert" className="error">
           Could not create the file. Your title is still here — try again.

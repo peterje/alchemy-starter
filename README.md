@@ -41,7 +41,7 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | `apps/website/src/atoms.ts`                         | The AtomHttpApi client and demo user atom shared by every route      |
 | `apps/website/src/routes/index.tsx`                 | A user's chats and the create form                                   |
 | `apps/website/src/routes/chats.$chatId.tsx`         | One chat: members, messages, join, and send                          |
-| `apps/website/src/routes/files.tsx`                 | A user's files and the create form                                   |
+| `apps/website/src/routes/files.tsx`                 | A user's files, the create form, and the example starters            |
 | `apps/website/src/routes/documents.$documentId.tsx` | One document: pages, rename, edit and add paragraphs                 |
 | `apps/website/src/routes/decks.$deckId.tsx`         | One deck: rename, add and delete slides                              |
 | `apps/website/src/blocks.tsx`                       | Block renderers shared by the measuring pass and the pages           |
@@ -50,6 +50,7 @@ Local Alchemy runs need Cloudflare credentials for account and state resolution.
 | `apps/website/src/document-measure.ts`              | Reads block heights and break offsets from the offscreen copy        |
 | `apps/website/src/slide-deck.tsx`                   | Real-size 16:9 slides scaled to fit the screen                       |
 | `apps/website/src/math.ts`                          | LaTeX to KaTeX HTML                                                  |
+| `apps/website/src/examples.ts`                      | Example files that exercise every block kind and slide layout        |
 | `apps/website/src/routes/__root.tsx`                | TanStack Start document and the demo user picker                     |
 | `apps/website/src/routes/api.$.ts`                  | Same-origin API route forwarding through an Alchemy service binding  |
 | `test/chats.test.ts`                                | Integration tests against actual Workers and Durable Objects         |

@@ -59,3 +59,19 @@ test("a deck is created from the library and gains and loses slides", async ({ p
   await expect(page.getByRole("figure", { name: "Slide 2" })).toHaveCount(0);
   await expect(page.getByRole("figure", { name: "Slide 1" })).toContainText("Objectives");
 });
+
+test("the example files paginate into several pages and render every slide", async ({ page }) => {
+  await page.goto("/files");
+  await page.getByRole("button", { name: "Algebra worksheet" }).click();
+  await expect(
+    page.getByRole("region", { name: "Algebra 1: Solving Linear Equations" }),
+  ).toBeVisible();
+  // The forced page break guarantees a second page; the challenge closes the last one.
+  const pages = page.getByRole("region", { name: /^Page \d+ of \d+$/u });
+  await expect(pages.nth(1)).toBeVisible();
+  await expect(pages.last()).toContainText("Challenge");
+
+  await page.getByRole("link", { name: "Files" }).click();
+  await page.getByRole("button", { name: "Lesson deck" }).click();
+  await expect(page.getByRole("figure", { name: "Slide 7" })).toContainText("Exit ticket");
+});

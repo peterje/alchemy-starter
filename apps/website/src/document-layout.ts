@@ -30,11 +30,30 @@ export type PageLayout = ReadonlyArray<ReadonlyArray<PageSlice>>;
 /** Minimum lines kept together on either side of a split (orphan and widow control). */
 const MIN_LINES = 2;
 
-/** Height a following block needs on the same page for a heading not to be stranded. */
-function leadHeight(measure: BlockMeasure | undefined, contentHeight: number): number {
+/** Height the blocks after `index` need on the same page for a heading at `index - 1` not to be stranded. */
+function leadHeight(
+  measures: ReadonlyArray<BlockMeasure>,
+  index: number,
+  contentHeight: number,
+): number {
+  const measure = measures[index];
   if (measure === undefined || measure.isPageBreak) return 0;
-  const lead = measure.breakOffsets[MIN_LINES - 1] ?? measure.breakOffsets[0] ?? measure.height;
-  return Math.min(lead, measure.height, contentHeight / 3);
+  // A block that itself keeps with its follower drags that follower's lead along, so a heading
+  // above a prompt above a writing space moves as one.
+  if (measure.keepWithNext) {
+    return Math.min(
+      measure.height + leadHeight(measures, index + 1, contentHeight),
+      contentHeight / 3,
+    );
+  }
+  // Orphan and widow control means a block shorter than 2 * MIN_LINES never splits, so all of it
+  // must follow the heading; a longer one needs only its first MIN_LINES lines.
+  const lines = measure.breakOffsets.length + 1;
+  const splittable = !measure.keepLinesTogether || lines >= MIN_LINES * 2;
+  const lead = splittable
+    ? (measure.breakOffsets[MIN_LINES - 1] ?? measure.height)
+    : measure.height;
+  return Math.min(lead, contentHeight / 3);
 }
 
 function chooseSplit(
@@ -109,7 +128,7 @@ export function paginate(measures: ReadonlyArray<BlockMeasure>, contentHeight: n
       return;
     }
     if (measure.keepWithNext && currentPage().length > 0) {
-      const needed = measure.height + leadHeight(measures[blockIndex + 1], contentHeight);
+      const needed = measure.height + leadHeight(measures, blockIndex + 1, contentHeight);
       if (needed > contentHeight - y) newPage();
     }
     place(blockIndex, measure, 0);

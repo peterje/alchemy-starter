@@ -110,3 +110,8 @@ a {
 nav {
   margin-top: 1rem;
 }
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
