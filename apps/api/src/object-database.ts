@@ -25,6 +25,17 @@ export class ObjectDatabase extends Context.Service<
     readonly queryOne: <Row>(
       statement: Statement<Schema.ConstraintDecoder<Row>>,
     ) => Effect.Effect<Row, never, RuntimeContext>;
+    /** For statements whose rows are not needed. */
+    readonly execute: (
+      statement: Omit<Statement<never>, "schema">,
+    ) => Effect.Effect<void, never, RuntimeContext>;
+    /**
+     * Runs `body` inside one SQLite transaction. Object SQL is synchronous, so the body runs to
+     * completion before the transaction commits; a defect rolls it back.
+     */
+    readonly transaction: <A>(
+      body: Effect.Effect<A, never, RuntimeContext>,
+    ) => Effect.Effect<A, never, RuntimeContext>;
   }
 >()("ObjectDatabase") {
   /** Applies pending migrations once per activation, then serves schema-decoded queries. */
@@ -62,6 +73,13 @@ export class ObjectDatabase extends Context.Service<
               Effect.flatMap((cursor) => cursor.one()),
               Effect.flatMap(Schema.decodeUnknownEffect(schema)),
               Effect.orDie,
+            ),
+          execute: ({ sql, values = [] }) => Effect.asVoid(state.storage.sql.exec(sql, ...values)),
+          transaction: (body) =>
+            Effect.flatMap(Effect.context<RuntimeContext>(), (context) =>
+              Effect.sync(() =>
+                storage.transactionSync(() => Effect.runSync(Effect.provideContext(body, context))),
+              ),
             ),
         });
       }),

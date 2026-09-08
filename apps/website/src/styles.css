@@ -106,3 +106,34 @@ a {
 .error {
   color: #9f1239;
 }
+nav {
+  margin-top: 1rem;
+}
+.blocks table,
+.blocks td,
+.blocks th {
+  border: 1px solid #c9c7bf;
+  border-collapse: collapse;
+  padding: 0.35rem 0.5rem;
+}
+.blocks .borderless,
+.blocks .borderless td {
+  border: 0;
+}
+.blank {
+  display: inline-block;
+  border-bottom: 1px solid currentColor;
+}
+.workspace {
+  border: 1px solid #c9c7bf;
+}
+.workspace.lines {
+  background: repeating-linear-gradient(transparent 0 0.38in, #c9c7bf 0.38in 0.4in);
+}
+.columns {
+  display: grid;
+  gap: 1rem;
+}
+.slide {
+  padding: 1rem 0;
+}

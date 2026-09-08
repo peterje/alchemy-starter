@@ -73,11 +73,14 @@ function Document({ children }: Readonly<{ children: ReactNode }>) {
           <p className="eyebrow">
             <Link to="/">Alchemy + Effect starter</Link>
           </p>
-          <h1>Every chat is an object.</h1>
+          <h1>Every chat, document, and deck is an object.</h1>
           <p>
-            Each chat is a Durable Object with its own SQLite database: one writer for its members
-            and messages. Each user's object indexes the chats they belong to. No ORM.
+            Each is a Durable Object with its own SQLite database and a single writer. Each user's
+            object indexes the chats they belong to and the files they created. No ORM.
           </p>
+          <nav aria-label="Sections">
+            <Link to="/">Chats</Link> · <Link to="/files">Files</Link>
+          </nav>
           {children}
         </main>
         <Scripts />

@@ -20,7 +20,7 @@
     "lint": "bun --bun oxlint .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.bun.json",
     "test:plugins": "node --experimental-strip-types --test packages/oxlint-plugins/*.rule.ts",
-    "test:integration": "bun test test/chats.test.ts",
+    "test:integration": "bun test test",
     "test:browser": "playwright test",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test:plugins && bun run build"
   },

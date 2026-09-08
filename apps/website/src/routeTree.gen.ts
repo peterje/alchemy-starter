@@ -9,13 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as FilesRouteImport } from './routes/files'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
+import { Route as DecksDeckIdRouteImport } from './routes/decks.$deckId'
 import { Route as ChatsChatIdRouteImport } from './routes/chats.$chatId'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 
+const FilesRoute = FilesRouteImport.update({
+  id: '/files',
+  path: '/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
+  id: '/documents/$documentId',
+  path: '/documents/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DecksDeckIdRoute = DecksDeckIdRouteImport.update({
+  id: '/decks/$deckId',
+  path: '/decks/$deckId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatsChatIdRoute = ChatsChatIdRouteImport.update({
@@ -31,41 +49,93 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/files': typeof FilesRoute
   '/api/$': typeof ApiSplatRoute
   '/chats/$chatId': typeof ChatsChatIdRoute
+  '/decks/$deckId': typeof DecksDeckIdRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/files': typeof FilesRoute
   '/api/$': typeof ApiSplatRoute
   '/chats/$chatId': typeof ChatsChatIdRoute
+  '/decks/$deckId': typeof DecksDeckIdRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/files': typeof FilesRoute
   '/api/$': typeof ApiSplatRoute
   '/chats/$chatId': typeof ChatsChatIdRoute
+  '/decks/$deckId': typeof DecksDeckIdRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/$' | '/chats/$chatId'
+  fullPaths:
+    | '/'
+    | '/files'
+    | '/api/$'
+    | '/chats/$chatId'
+    | '/decks/$deckId'
+    | '/documents/$documentId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/$' | '/chats/$chatId'
-  id: '__root__' | '/' | '/api/$' | '/chats/$chatId'
+  to:
+    | '/'
+    | '/files'
+    | '/api/$'
+    | '/chats/$chatId'
+    | '/decks/$deckId'
+    | '/documents/$documentId'
+  id:
+    | '__root__'
+    | '/'
+    | '/files'
+    | '/api/$'
+    | '/chats/$chatId'
+    | '/decks/$deckId'
+    | '/documents/$documentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FilesRoute: typeof FilesRoute
   ApiSplatRoute: typeof ApiSplatRoute
   ChatsChatIdRoute: typeof ChatsChatIdRoute
+  DecksDeckIdRoute: typeof DecksDeckIdRoute
+  DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/files': {
+      id: '/files'
+      path: '/files'
+      fullPath: '/files'
+      preLoaderRoute: typeof FilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents/$documentId': {
+      id: '/documents/$documentId'
+      path: '/documents/$documentId'
+      fullPath: '/documents/$documentId'
+      preLoaderRoute: typeof DocumentsDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/decks/$deckId': {
+      id: '/decks/$deckId'
+      path: '/decks/$deckId'
+      fullPath: '/decks/$deckId'
+      preLoaderRoute: typeof DecksDeckIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chats/$chatId': {
@@ -87,8 +157,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FilesRoute: FilesRoute,
   ApiSplatRoute: ApiSplatRoute,
   ChatsChatIdRoute: ChatsChatIdRoute,
+  DecksDeckIdRoute: DecksDeckIdRoute,
+  DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
