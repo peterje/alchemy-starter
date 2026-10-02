@@ -7,6 +7,7 @@
     "./*": "./src/*.ts"
   },
   "dependencies": {
+    "@effect/sql-pg": "4.0.0",
     "@starter/contract": "workspace:*",
     "alchemy": "2.0.0-beta.80",
     "effect": "4.0.0"

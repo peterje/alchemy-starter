@@ -5,7 +5,6 @@ dist/
 .tanstack/
 .env
 .env.*
-!.env.example
 *.tsbuildinfo
 playwright-report/
 test-results/
