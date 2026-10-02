@@ -2,6 +2,20 @@
 
 This repository is a template. Every file is an example future code will copy, so keep changes idiomatic and delete anything that is not pulling its weight.
 
+## Bootstrap
+
+When someone forks this template and asks you to set it up, take them from zero to a production URL. Assume they are not technical: explain each step in one plain sentence, run everything you can yourself, and hand them a `! <command>` line for anything that opens a browser or takes a secret. Never ask them to paste a secret into the chat. Check each step's state before acting so asking again resumes where they left off.
+
+- **Tools.** Confirm `bun`, `gh`, and a Cloudflare account. Install what is missing (`curl -fsSL https://bun.sh/install | bash`, `brew install gh`) and have them run `! gh auth login`.
+- **Repository.** Read the fork with `gh repo view --json owner,name` and set `GITHUB_OWNER` and `GITHUB_REPOSITORY` in `stacks/github.ts`. Run `bun install`.
+- **Cloudflare login.** Have them run `! bun alchemy profile create` and choose Cloudflare, OAuth, and All Scopes. `bun alchemy profile show` confirms it and shows the account ID.
+- **Local app.** Start `bun run dev` and have them open http://localhost:1337.
+- **CI credentials.** CI gets its own scoped token from `stacks/github.ts`, but Cloudflare OAuth cannot create API tokens, so this step needs a temporary one. In the Cloudflare dashboard, have them open **Manage Account → Account API Tokens**, create a short-lived token with only the **Account API Tokens → Edit** permission, and save it without echoing:
+  `! printf 'Token: '; read -rs t; printf 'CLOUDFLARE_API_TOKEN=%s\n' "$t" > .env.bootstrap`
+  Append `CLOUDFLARE_ACCOUNT_ID=<id>`, run `GITHUB_TOKEN=$(gh auth token) bun run ci:provision --env-file .env.bootstrap --yes`, delete `.env.bootstrap`, and have them delete the temporary token in the dashboard.
+- **Production.** Every push to `main` that passes CI deploys to the `prod` stage. Commit the `stacks/github.ts` change, push, and watch with `gh run watch`. Read the website URL from the deploy log and give it to them.
+- **Next.** Point them at the feature recipe below, and warn them that the demo trusts the client's user ID: add authentication before storing private data.
+
 ## Architecture
 
 - The workspace is split by runtime. `packages/contract` (schemas, IDs, errors, `HttpApi` groups) runs everywhere and depends on Effect only. `apps/api` (the Worker and one file per Durable Object) runs in workerd. `apps/website` (routes, atoms) runs in the browser and SSR. The website never imports `@starter/api`; the Vite build fails if it does.

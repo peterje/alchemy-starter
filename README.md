@@ -1,5 +1,7 @@
 # Alchemy starter
 
+Fork this repository, open it in Claude Code, and say **set this up**. The agent follows the bootstrap guide in `AGENTS.md` from install to a production URL.
+
 A small demo with **Effect, Alchemy, and TanStack Start**. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
 
 The UI switches between Alice and Bob, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
@@ -80,4 +82,4 @@ See [Alchemy's integration testing tutorial](https://alchemy.run/cloudflare/tuto
 
 The template keeps TypeScript strictness, Effect/React architecture lint rules in `packages/oxlint-plugins`, oxfmt, commit hooks, Playwright, and GitHub Actions. The browser build rejects server-only imports. No React `useState`/`useEffect` or additional client state library is needed.
 
-Provision CI credentials with `bun run ci:provision` after pointing `stacks/github.ts` at your repository. Production deploys remain gated by the repository's `CLOUDFLARE_DEPLOY_ENABLED` variable.
+Every push to `main` that passes CI deploys to production. `bun run ci:provision` gives CI its own scoped Cloudflare token; the bootstrap guide in `AGENTS.md` walks through it.
