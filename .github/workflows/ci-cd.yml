@@ -1,5 +1,8 @@
 name: CI/CD
 
+# Deploying and verifying are separate: a pull request's preview deploys the moment it is pushed,
+# whatever the checks say, while verification runs beside it. Only production waits for checks.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -10,116 +13,22 @@ on:
 permissions:
   contents: read
 
-# Never cancel a run mid-deploy: a stage half-created or half-destroyed leaves a database branch
-# that the next run has to reclaim. A newer push waits for the current run instead.
-concurrency:
-  group: starter-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
 env:
   PREVIEW_STAGE: pr-${{ github.event.pull_request.number }}
+  # Each pull request's test stages are named after this user (`test_$USER`, `browser_$USER`)
+  # and live until the pull request closes, so later pushes reuse their database branches.
+  USER: ci-${{ github.event.pull_request.number || 'main' }}
 
 jobs:
-  verify:
-    name: Verify
-    if: github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-      - name: Install frozen workspace
-        run: bun install --frozen-lockfile
-      - name: Check formatting, lint, types, tests, and build
-        run: bun run check
-      - name: Check whitespace
-        run: git diff --check
-
-  database:
-    name: Database
-    if: github.event.action != 'closed'
-    needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PLANETSCALE_API_TOKEN_ID: ${{ secrets.PLANETSCALE_API_TOKEN_ID }}
-      PLANETSCALE_API_TOKEN: ${{ secrets.PLANETSCALE_API_TOKEN }}
-      PLANETSCALE_ORGANIZATION: ${{ secrets.PLANETSCALE_ORGANIZATION }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-      - name: Install frozen workspace
-        run: bun install --frozen-lockfile
-      - name: Check credentials
-        run: bun alchemy provider check-env --provider Cloudflare --provider Planetscale
-      # Pull requests show what a database change would do; only a merge applies it.
-      - name: Plan database changes
-        if: github.event_name == 'pull_request'
-        run: bun alchemy plan stacks/database.ts --stage shared
-      - name: Deploy database changes
-        if: github.event_name == 'push'
-        run: bun alchemy deploy stacks/database.ts --stage shared --yes
-
-  integration:
-    name: Integration
-    if: github.event.action != 'closed'
-    needs: database
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PLANETSCALE_API_TOKEN_ID: ${{ secrets.PLANETSCALE_API_TOKEN_ID }}
-      PLANETSCALE_API_TOKEN: ${{ secrets.PLANETSCALE_API_TOKEN }}
-      PLANETSCALE_ORGANIZATION: ${{ secrets.PLANETSCALE_ORGANIZATION }}
-      # The test stages are named after the user (`test_$USER`, `browser_$USER`), so runs for
-      # different pull requests never share a stage or a database branch.
-      USER: ci-${{ github.event.pull_request.number || 'main' }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
-      - name: Install frozen workspace
-        run: bun install --frozen-lockfile
-      - name: Install Chromium
-        run: bunx playwright install --with-deps chromium
-      - name: Run Worker, Durable Object, and Postgres integration suite
-        run: bun run test:integration
-      - name: Run browser integration suite
-        run: bun run test:browser
-      - name: Destroy the browser suite's stage
-        if: always()
-        run: bun alchemy destroy --stage "browser_$USER" --yes
-      - name: Upload browser diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-diagnostics-${{ github.run_id }}
-          path: |
-            playwright-report/
-            test-results/
-          if-no-files-found: ignore
-          retention-days: 7
-
   preview:
     name: Deploy preview
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
-    needs: integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Never cancel a deploy midway; a newer push waits and then deploys the latest commit.
+    concurrency:
+      group: preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: write
@@ -146,18 +55,14 @@ jobs:
       - name: Deploy the pull request's stage
         run: bun alchemy deploy --stage "$PREVIEW_STAGE" --yes
 
-  cleanup:
-    name: Destroy preview
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+  verify:
+    name: Verify
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PLANETSCALE_API_TOKEN_ID: ${{ secrets.PLANETSCALE_API_TOKEN_ID }}
-      PLANETSCALE_API_TOKEN: ${{ secrets.PLANETSCALE_API_TOKEN }}
-      PLANETSCALE_ORGANIZATION: ${{ secrets.PLANETSCALE_ORGANIZATION }}
-      TEST_USER: ci-${{ github.event.pull_request.number }}
+    timeout-minutes: 10
+    concurrency:
+      group: verify-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -167,21 +72,146 @@ jobs:
           bun-version-file: package.json
       - name: Install frozen workspace
         run: bun install --frozen-lockfile
-      # Test stages are normally destroyed by their own run; these catch any a failed run left.
+      - name: Check formatting, lint, types, tests, and build
+        run: bun run check
+      - name: Check whitespace
+        run: git diff --check
+
+  database:
+    name: Database
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: database-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PLANETSCALE_API_TOKEN_ID: ${{ secrets.PLANETSCALE_API_TOKEN_ID }}
+      PLANETSCALE_API_TOKEN: ${{ secrets.PLANETSCALE_API_TOKEN }}
+      PLANETSCALE_ORGANIZATION: ${{ secrets.PLANETSCALE_ORGANIZATION }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Install frozen workspace
+        run: bun install --frozen-lockfile
+      - name: Check credentials
+        run: bun alchemy provider check-env --provider Cloudflare --provider Planetscale
+      # Pull requests show what a database change would do; only a merge applies it.
+      - name: Plan database changes
+        if: github.event_name == 'pull_request'
+        run: bun alchemy plan stacks/database.ts --stage shared
+      - name: Deploy database changes
+        if: github.event_name == 'push'
+        run: bun alchemy deploy stacks/database.ts --stage shared --yes
+
+  api-tests:
+    name: API tests
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Safe to cancel: the stage and its state outlive the run.
+    concurrency:
+      group: api-tests-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PLANETSCALE_API_TOKEN_ID: ${{ secrets.PLANETSCALE_API_TOKEN_ID }}
+      PLANETSCALE_API_TOKEN: ${{ secrets.PLANETSCALE_API_TOKEN }}
+      PLANETSCALE_ORGANIZATION: ${{ secrets.PLANETSCALE_ORGANIZATION }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Install frozen workspace
+        run: bun install --frozen-lockfile
+      - name: Run Worker, Durable Object, and Postgres integration suite
+        run: bun run test:integration
+
+  browser-tests:
+    name: Browser tests
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: browser-tests-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PLANETSCALE_API_TOKEN_ID: ${{ secrets.PLANETSCALE_API_TOKEN_ID }}
+      PLANETSCALE_API_TOKEN: ${{ secrets.PLANETSCALE_API_TOKEN }}
+      PLANETSCALE_ORGANIZATION: ${{ secrets.PLANETSCALE_ORGANIZATION }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Install frozen workspace
+        run: bun install --frozen-lockfile
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Run browser integration suite
+        run: bun run test:browser
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  cleanup:
+    name: Destroy preview
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PLANETSCALE_API_TOKEN_ID: ${{ secrets.PLANETSCALE_API_TOKEN_ID }}
+      PLANETSCALE_API_TOKEN: ${{ secrets.PLANETSCALE_API_TOKEN }}
+      PLANETSCALE_ORGANIZATION: ${{ secrets.PLANETSCALE_ORGANIZATION }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Install frozen workspace
+        run: bun install --frozen-lockfile
       - name: Destroy the pull request's stages and database branches
         run: |
           bun alchemy destroy --stage "$PREVIEW_STAGE" --yes
-          bun alchemy destroy --stage "test_$TEST_USER" --yes
-          bun alchemy destroy --stage "browser_$TEST_USER" --yes
+          bun alchemy destroy --stage "test_$USER" --yes
+          bun alchemy destroy --stage "browser_$USER" --yes
 
   deploy:
     name: Deploy production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: integration
+    needs: [database, verify, api-tests, browser-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
-      group: starter-production
+      group: production
       cancel-in-progress: false
     environment:
       name: production

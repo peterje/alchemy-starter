@@ -20,15 +20,15 @@ import Stack from "../alchemy.run.ts";
 
 // Deploy the real stack into local workerd: actual Durable Object SQLite databases and the
 // stage's own PlanetScale branch.
-const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
+const { test, beforeAll, deploy } = Test.make({
   providers: Layer.mergeAll(Cloudflare.providers(), Planetscale.providers()),
-  // Shared state, so a CI run that stops before teardown leaves a branch the next run can reclaim.
+  // Shared state, so the next CI run, and the cleanup job, find the stage this run left.
   state: Cloudflare.state(),
   dev: true,
 });
-// Creating the stage's database branch takes minutes, so local runs keep theirs between runs.
+// Creating the stage's database branch takes minutes, so the stage outlives the run: later runs
+// reuse it, and closing a pull request destroys its CI stages.
 const stack = beforeAll(deploy(Stack), { timeout: 600_000 });
-afterAll.skipIf(!process.env.CI)(destroy(Stack), { timeout: 600_000 });
 
 const client = Effect.gen(function* () {
   const { websiteUrl } = yield* stack;

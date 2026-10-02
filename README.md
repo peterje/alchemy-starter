@@ -70,7 +70,7 @@ Every stage gets its own [PlanetScale branch](https://planetscale.com/docs/postg
 
 The Worker reaches its branch through [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) with query caching off, so a read never returns a row from before the latest write; Hyperdrive still pools connections near the database. Queries use `@effect/sql-pg` through Alchemy's `SQL.Postgres`, which opens a pool on a request's first query and closes it when the request ends.
 
-Each pull request deploys to its own `pr-<number>` stage, and the workflow comments the preview URL on the pull request. Closing the pull request destroys the stage and its branch.
+Each pull request deploys to its own `pr-<number>` stage the moment it is pushed, without waiting for checks, and the stack comments the preview URL on the pull request. Verification runs beside it, each suite on a stage and branch of its own that later pushes reuse. Closing the pull request destroys all three. Production deploys only after the checks pass on `main`.
 
 ## Versioned files
 
