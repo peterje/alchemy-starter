@@ -61,7 +61,7 @@ jobs:
       - name: Install frozen workspace
         run: bun install --frozen-lockfile
       - name: Check credentials
-        run: bun alchemy provider check-env
+        run: bun alchemy provider check-env --provider Cloudflare --provider Planetscale
       # Pull requests show what a database change would do; only a merge applies it.
       - name: Plan database changes
         if: github.event_name == 'pull_request'
@@ -142,7 +142,7 @@ jobs:
       - name: Install frozen workspace
         run: bun install --frozen-lockfile
       - name: Check credentials
-        run: bun alchemy provider check-env
+        run: bun alchemy provider check-env --provider Cloudflare --provider Planetscale --provider GitHub
       - name: Deploy the pull request's stage
         run: bun alchemy deploy --stage "$PREVIEW_STAGE" --yes
 
@@ -201,6 +201,6 @@ jobs:
       - name: Install frozen workspace
         run: bun install --frozen-lockfile
       - name: Check credentials
-        run: bun alchemy provider check-env
+        run: bun alchemy provider check-env --provider Cloudflare --provider Planetscale
       - name: Deploy production stack
         run: bun alchemy deploy --stage prod --yes
