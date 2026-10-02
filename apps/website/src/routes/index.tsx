@@ -9,7 +9,7 @@ import type { Deck } from "@starter/contract/slides";
 import type { UserId } from "@starter/contract/user";
 import { createFileRoute, Link, useHydrated, useNavigate } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { Suspense } from "react";
 
 import { client, userAtom } from "../atoms.ts";

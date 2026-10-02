@@ -12,8 +12,8 @@ import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Test from "alchemy/Test/Bun";
 import { Effect, Result } from "effect";
-import { HttpBody, HttpClient } from "effect/unstable/http";
-import { HttpApiClient } from "effect/unstable/httpapi";
+import { HttpBody, HttpClient } from "effect/http";
+import { HttpApiClient } from "effect/http-api";
 
 import Stack from "../alchemy.run.ts";
 

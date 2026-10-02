@@ -4,8 +4,8 @@ import { DeckNotFound } from "@starter/contract/slides";
 import { InvalidOperation } from "@starter/contract/versioning";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Config, Effect, Layer } from "effect";
-import { HttpRouter, HttpServer } from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpRouter, HttpServer } from "effect/http";
+import { HttpApiBuilder } from "effect/http-api";
 
 import DeckObject from "./deck-object.ts";
 import DocumentObject from "./document-object.ts";
@@ -19,7 +19,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   {
     main: import.meta.url,
     workersDev: false,
-    dev: { port: Config.number("API_PORT").pipe(Config.withDefault(1338)) },
+    dev: { port: Config.Number("API_PORT").pipe(Config.withDefault(1338)) },
   },
   Effect.gen(function* () {
     const users = yield* UserStore;

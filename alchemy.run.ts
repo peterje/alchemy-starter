@@ -6,7 +6,7 @@ import ApiWorker from "./apps/api/src/worker.ts";
 
 export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
   rootDir: "apps/website",
-  dev: { port: Config.number("PORT").pipe(Config.withDefault(1337)) },
+  dev: { port: Config.Number("PORT").pipe(Config.withDefault(1337)) },
   env: { API: ApiWorker },
 }) {}
 

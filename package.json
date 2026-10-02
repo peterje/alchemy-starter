@@ -25,10 +25,10 @@
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test:plugins && bun run build"
   },
   "dependencies": {
-    "@effect/platform-bun": "4.0.0-rc.110",
-    "@effect/platform-node": "4.0.0-rc.110",
-    "alchemy": "2.0.0-beta.72",
-    "effect": "4.0.0-rc.110"
+    "@effect/platform-bun": "4.0.0",
+    "@effect/platform-node": "4.0.0",
+    "alchemy": "2.0.0-beta.80",
+    "effect": "4.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260812.1",
@@ -46,7 +46,7 @@
     "vite": "8.0.7"
   },
   "overrides": {
-    "effect": "4.0.0-rc.110"
+    "effect": "4.0.0"
   },
   "commitlint": {
     "extends": [

@@ -5,8 +5,8 @@ import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
 import { env } from "cloudflare:workers";
 import { Layer } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { Atom, AtomHttpApi } from "effect/unstable/reactivity";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { Atom, AtomHttpApi } from "effect/reactivity";
 
 const pageOrigin = createIsomorphicFn()
   .client(() => globalThis.location.origin)

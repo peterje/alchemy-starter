@@ -1,6 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { type DocumentState, pageGeometry } from "@starter/contract/documents";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 import { useCallback } from "react";
 
 import { DocumentBlock } from "./blocks.tsx";

@@ -3,7 +3,7 @@ import { DocumentTitle } from "@starter/contract/documents";
 import { DeckId, type DeckOperation, type DeckOperationResult } from "@starter/contract/slides";
 import { createFileRoute, useHydrated } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 import { Suspense } from "react";
 
 import { client } from "../atoms.ts";
