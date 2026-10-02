@@ -10,21 +10,25 @@ import {
 import { type Deck, DeckId } from "@starter/contract/slides";
 import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
+import * as Planetscale from "alchemy/Planetscale";
 import * as Test from "alchemy/Test/Bun";
-import { Effect, Result } from "effect";
+import { Effect, Layer, Result } from "effect";
 import { HttpBody, HttpClient } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
 import Stack from "../alchemy.run.ts";
 
-// Deploy the real stack into local workerd, including actual Durable Object SQLite databases.
-const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
-  providers: Cloudflare.providers(),
+// Deploy the real stack into local workerd: actual Durable Object SQLite databases and the
+// stage's own PlanetScale branch.
+const { test, beforeAll, deploy } = Test.make({
+  providers: Layer.mergeAll(Cloudflare.providers(), Planetscale.providers()),
+  // Shared state, so the next CI run, and the cleanup job, find the stage this run left.
+  state: Cloudflare.state(),
   dev: true,
-  stage: "api-test",
 });
-const stack = beforeAll(deploy(Stack));
-afterAll(destroy(Stack));
+// Creating the stage's database branch takes minutes, so the stage outlives the run: later runs
+// reuse it, and closing a pull request destroys its CI stages.
+const stack = beforeAll(deploy(Stack), { timeout: 600_000 });
 
 const client = Effect.gen(function* () {
   const { websiteUrl } = yield* stack;
@@ -44,6 +48,33 @@ const lesson: Deck = {
   meta: { title: "Lesson" },
   items: [{ id: "cover", layout: "title", title: [{ type: "text", text: "Lesson" }], body: [] }],
 };
+
+test(
+  "users live in Postgres, starting with the seeded demo users",
+  Effect.gen(function* () {
+    const { websiteUrl } = yield* stack;
+    const api = yield* client;
+
+    const created = yield* api.users.create({ payload: { name: "Carol" } });
+    const users = yield* api.users.list();
+    expect(users.slice(0, 2).map((user) => user.id)).toEqual([
+      UserId.make("alice"),
+      UserId.make("bob"),
+    ]);
+    expect(users).toContainEqual(created);
+
+    // The server decodes names at its boundary, so raw requests are trimmed or rejected there.
+    const padded = yield* HttpClient.post(`${websiteUrl}/api/users`, {
+      body: HttpBody.jsonUnsafe({ name: "  Dana  " }),
+    });
+    expect(yield* padded.json).toMatchObject({ name: "Dana" });
+    const blank = yield* HttpClient.post(`${websiteUrl}/api/users`, {
+      body: HttpBody.jsonUnsafe({ name: "   " }),
+    });
+    expect(blank.status).toBe(400);
+  }),
+  { timeout: 120_000 },
+);
 
 test(
   "a document object versions its blocks, replays operations, and reports conflicts",

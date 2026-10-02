@@ -3,13 +3,15 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import * as GitHub from "alchemy/GitHub";
 import { Effect, Layer, Redacted } from "effect";
 
-// Point these at your fork before running `bun run ci:provision`.
+// Point these at your fork before running `bun run provision`.
 const GITHUB_OWNER = "peterje";
 const GITHUB_REPOSITORY = "alchemy-starter";
 
 /**
- * Administrative bootstrap stack that provisions scoped Cloudflare credentials
- * for the starter GitHub Actions pipeline.
+ * The scoped Cloudflare credentials GitHub Actions deploys with. Minting a token takes more
+ * access than CI should hold, so a person deploys this stack once under the `admin` profile with
+ * `bun run provision`, and CI never does. Alchemy has no PlanetScale service token resource, so
+ * the bootstrap guide creates CI's PlanetScale token with `pscale`.
  */
 export default Alchemy.Stack(
   "StarterGitHub",
@@ -28,6 +30,7 @@ export default Alchemy.Stack(
             "Workers Scripts Write",
             "Account Settings Write",
             "Secrets Store Write",
+            "Hyperdrive Write",
           ],
           resources: {
             [`com.cloudflare.api.account.${accountId}`]: "*",

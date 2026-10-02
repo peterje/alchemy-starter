@@ -1,14 +1,18 @@
 import { Api } from "@starter/contract/api";
 import { DocumentNotFound } from "@starter/contract/documents";
 import { DeckNotFound } from "@starter/contract/slides";
+import { User, UserId } from "@starter/contract/user";
 import { InvalidOperation } from "@starter/contract/versioning";
 import * as Cloudflare from "alchemy/Cloudflare";
-import { Config, Effect, Layer } from "effect";
+import * as SQL from "alchemy/SQL/Postgres";
+import { Config, Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
+import { SqlSchema } from "effect/sql";
 
 import DeckObject from "./deck-object.ts";
 import DocumentObject from "./document-object.ts";
+import { Postgres } from "./postgres.ts";
 import UserStore from "./user-store.ts";
 
 // A typed failure crosses an object stub as a plain tagged object, so each handler rebuilds
@@ -22,17 +26,41 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     dev: { port: Config.Number("API_PORT").pipe(Config.withDefault(1338)) },
   },
   Effect.gen(function* () {
-    const users = yield* UserStore;
+    const postgres = yield* Cloudflare.Hyperdrive.Connect(Postgres);
+    // Opens a pool on a request's first query and closes it when the request ends: Hyperdrive
+    // already keeps the connections to the database warm.
+    const sql = yield* SQL.Postgres({ url: postgres.connectionString });
+    const userStores = yield* UserStore;
     const documents = yield* DocumentObject;
     const decks = yield* DeckObject;
+
+    // Storage failures are defects: the HTTP boundary logs them and answers 500.
+    const listUsers = SqlSchema.findAll({
+      Request: Schema.Void,
+      Result: User,
+      execute: () => sql`SELECT id, name FROM users ORDER BY created_at, id`,
+    });
+    const insertUser = SqlSchema.findOne({
+      Request: User,
+      Result: User,
+      execute: (user) => sql`INSERT INTO users ${sql.insert(user)} RETURNING id, name`,
+    });
+    const usersGroup = HttpApiBuilder.group(Api, "users", (handlers) =>
+      handlers.handleAll({
+        list: () => Effect.orDie(listUsers(undefined)),
+        create: ({ payload }) =>
+          Effect.orDie(insertUser({ id: UserId.make(crypto.randomUUID()), name: payload.name })),
+      }),
+    );
 
     // Demo routing only. Select the user's object from a verified session before storing private data.
     const files = HttpApiBuilder.group(Api, "files", (handlers) =>
       handlers.handleAll({
-        list: ({ params }) => users.getByName(params.userId).list(),
+        list: ({ params }) => userStores.getByName(params.userId).list(),
         createDocument: ({ params, payload }) =>
-          users.getByName(params.userId).createDocument(payload),
-        createDeck: ({ params, payload }) => users.getByName(params.userId).createDeck(payload),
+          userStores.getByName(params.userId).createDocument(payload),
+        createDeck: ({ params, payload }) =>
+          userStores.getByName(params.userId).createDeck(payload),
       }),
     );
     const documentsGroup = HttpApiBuilder.group(Api, "documents", (handlers) =>
@@ -93,10 +121,10 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     );
     return {
       fetch: HttpApiBuilder.layer(Api).pipe(
-        Layer.provide([files, documentsGroup, decksGroup]),
+        Layer.provide([usersGroup, files, documentsGroup, decksGroup]),
         Layer.provide(HttpServer.layerServices),
         HttpRouter.toHttpEffect,
       ),
     };
-  }),
+  }).pipe(Effect.provide(Cloudflare.Hyperdrive.ConnectBinding)),
 ) {}

@@ -1,5 +1,5 @@
-import { RegistryProvider, useAtom } from "@effect/atom-react";
-import { UserId } from "@starter/contract/user";
+import { RegistryProvider, useAtom, useAtomSuspense } from "@effect/atom-react";
+import { UserId, UserName } from "@starter/contract/user";
 import {
   HeadContent,
   Link,
@@ -8,13 +8,18 @@ import {
   createRootRoute,
   useHydrated,
 } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { Exit, Schema } from "effect";
+import { AsyncResult } from "effect/reactivity";
+import { type ReactNode, Suspense } from "react";
 
-import { userAtom } from "../atoms.ts";
+import { client, userAtom } from "../atoms.ts";
 
 import "../styles.css";
 
 /** Root document route for the starter demo. */
+const usersAtom = client.query("users", "list", { reactivityKeys: ["users"] });
+const createUserAtom = client.mutation("users", "create");
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -33,7 +38,9 @@ function RootComponent() {
   // The provider does not inherit the package default, which sweeps unused atoms after 400ms.
   return (
     <RegistryProvider defaultIdleTTL={400}>
-      <UserPicker />
+      <Suspense fallback={<p role="status">Loading users…</p>}>
+        <UserPicker />
+      </Suspense>
       <Outlet />
     </RegistryProvider>
   );
@@ -42,6 +49,16 @@ function RootComponent() {
 function UserPicker() {
   const hydrated = useHydrated();
   const [userId, selectUser] = useAtom(userAtom);
+  const users = useAtomSuspense(usersAtom, { includeFailure: true });
+  const [created, createUser] = useAtom(createUserAtom, { mode: "promiseExit" });
+  const busy = !hydrated || AsyncResult.isWaiting(created);
+  if (AsyncResult.isFailure(users)) {
+    return (
+      <p role="alert" className="error">
+        Could not load users. Reload to try again.
+      </p>
+    );
+  }
   return (
     <>
       <label className="user-picker">
@@ -51,10 +68,46 @@ function UserPicker() {
           disabled={!hydrated}
           onChange={(event) => selectUser(UserId.make(event.currentTarget.value))}
         >
-          <option value="alice">Alice</option>
-          <option value="bob">Bob</option>
+          {users.value.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.name}
+            </option>
+          ))}
         </select>
       </label>
+      <form
+        className="user-picker"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          // The input's constraint attributes mirror UserName, so a decode failure is a bug, not user error.
+          const name = Schema.decodeUnknownSync(UserName)(new FormData(form).get("name"));
+          const result = await createUser({ payload: { name }, reactivityKeys: ["users"] });
+          if (Exit.isSuccess(result)) {
+            form.reset();
+            selectUser(result.value.id);
+          }
+        }}
+      >
+        <label htmlFor="new-user">New user</label>
+        <input
+          id="new-user"
+          name="name"
+          disabled={busy}
+          required
+          pattern=".*\S.*"
+          maxLength={80}
+          placeholder="Carol"
+        />
+        <button type="submit" disabled={busy}>
+          Add user
+        </button>
+      </form>
+      {AsyncResult.isFailure(created) ? (
+        <p role="alert" className="error">
+          Could not add the user. Try again.
+        </p>
+      ) : null}
       <p className="hint">
         Public demo — switching users is not authentication. Don’t store private data.
       </p>

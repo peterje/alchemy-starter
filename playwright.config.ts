@@ -10,11 +10,13 @@ export default defineConfig({
     baseURL: "http://localhost:1341",
     trace: "retain-on-failure",
   },
-  // Use a dedicated stage and port so tests never clear a developer's demo notes.
+  // A stage and port of its own, so tests never touch a developer's demo data. Per user, like
+  // Test.make's default, so CI runs for different pull requests never share a stage.
   webServer: {
-    command: "PORT=1341 API_PORT=1342 bun run dev --stage browser-test",
+    command: "PORT=1341 API_PORT=1342 bun run dev --stage browser_${USER:-local}",
     url: "http://localhost:1341",
     reuseExistingServer: false,
-    timeout: 180_000,
+    // The first run creates the stage's database branch, which takes a few minutes.
+    timeout: 600_000,
   },
 });

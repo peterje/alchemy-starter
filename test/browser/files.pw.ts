@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// Files persist on the browser-test stage, so each test creates its own with a unique title.
+// Files persist on the browser stage, so each test creates its own with a unique title.
 test("a document is created from the library, edited block by block, and survives reloads", async ({
   page,
 }) => {

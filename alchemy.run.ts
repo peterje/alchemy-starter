@@ -1,21 +1,43 @@
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
-import { Config, Effect } from "effect";
+import * as GitHub from "alchemy/GitHub";
+import * as Output from "alchemy/Output";
+import * as Planetscale from "alchemy/Planetscale";
+import { Config, Effect, Layer } from "effect";
 
 import ApiWorker from "./apps/api/src/worker.ts";
 
 export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
   rootDir: "apps/website",
+  // The website imports the contract package, which sits outside its directory.
+  memo: { include: ["**/*", "../../packages/contract/src/**"], lockfile: true },
   dev: { port: Config.Number("PORT").pipe(Config.withDefault(1337)) },
   env: { API: ApiWorker },
 }) {}
 
 export default Alchemy.Stack(
   "Starter",
-  { providers: Cloudflare.providers(), state: Cloudflare.state() },
+  {
+    providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers(), Planetscale.providers()),
+    state: Cloudflare.state(),
+  },
   Effect.gen(function* () {
     yield* ApiWorker;
     const website = yield* Website;
+
+    // Set only by the preview job, so a pull request's stage keeps one comment up to date.
+    const github = yield* GitHub.GitHubEnv;
+    if (github?.pr) {
+      yield* GitHub.Comment("PreviewComment", {
+        owner: github.owner,
+        repository: github.repository,
+        issueNumber: github.pr,
+        body: Output.interpolate`Preview: ${website.url}
+
+Built from ${github.sha.slice(0, 7)} on a database branch of its own.`,
+      });
+    }
+
     return { websiteUrl: website.url.as<string>() };
   }),
 );
