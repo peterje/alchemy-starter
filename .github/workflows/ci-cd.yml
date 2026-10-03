@@ -1,7 +1,8 @@
 name: CI/CD
 
 # Deploying and verifying are separate: a pull request's preview deploys the moment it is pushed,
-# whatever the checks say, while verification runs beside it. Only production waits for checks.
+# whatever the checks say, while verification runs beside it. Branch protection requires those
+# checks before a merge, so a merge deploys to production without running them again.
 
 on:
   pull_request:
@@ -9,6 +10,8 @@ on:
   push:
     branches:
       - main
+  # Runs the required checks on merge queue entries, for forks that enable the queue.
+  merge_group:
 
 permissions:
   contents: read
@@ -17,7 +20,7 @@ env:
   PREVIEW_STAGE: pr-${{ github.event.pull_request.number }}
   # Each pull request's test stages are named after this user (`test_$USER`, `browser_$USER`)
   # and live until the pull request closes, so later pushes reuse their database branches.
-  USER: ci-${{ github.event.pull_request.number || 'main' }}
+  USER: ci-${{ github.event.pull_request.number || 'queue' }}
 
 jobs:
   preview:
@@ -57,7 +60,7 @@ jobs:
 
   verify:
     name: Verify
-    if: github.event.action != 'closed'
+    if: github.event_name != 'push' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -102,9 +105,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Check credentials
         run: bun alchemy provider check-env --provider Cloudflare --provider Planetscale
-      # Pull requests show what a database change would do; only a merge applies it.
+      # Pull requests and queue entries show what a database change would do; only a merge applies it.
       - name: Plan database changes
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: bun alchemy plan stacks/database.ts --stage shared
       - name: Deploy database changes
         if: github.event_name == 'push'
@@ -112,7 +115,7 @@ jobs:
 
   api-tests:
     name: API tests
-    if: github.event.action != 'closed'
+    if: github.event_name != 'push' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Safe to cancel: the stage and its state outlive the run.
@@ -139,7 +142,7 @@ jobs:
 
   browser-tests:
     name: Browser tests
-    if: github.event.action != 'closed'
+    if: github.event_name != 'push' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -207,7 +210,7 @@ jobs:
   deploy:
     name: Deploy production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [database, verify, api-tests, browser-tests]
+    needs: database
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:

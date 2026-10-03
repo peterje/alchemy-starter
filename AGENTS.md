@@ -21,7 +21,7 @@ When someone forks this template and asks you to set it up, take them from zero 
   gh secret set PLANETSCALE_ORGANIZATION --body "$ORG"
   ```
 - **Local app.** Start `bun run dev` and have them open http://localhost:1337. The first run creates their own database branch, which takes a few minutes.
-- **Production.** Every push to `main` that passes CI deploys to the `prod` stage, and every pull request gets a preview deployment with its own database branch. Commit the `stacks/github.ts` change, push, and watch with `gh run watch`. Read the website URL from the deploy log and give it to them.
+- **Production.** `main` only accepts pull requests whose checks pass, and each merge deploys to the `prod` stage. Every pull request also gets a preview deployment with its own database branch the moment it is pushed. Commit the `stacks/github.ts` change on a branch, open a pull request with `gh pr create`, give them the preview URL the stack comments, and merge with `gh pr merge --squash` once the checks pass. Watch the deploy with `gh run watch` and give them the production URL from its log.
 - **Next.** Point them at the feature recipe below, and warn them that the demo trusts the client's user ID: add authentication before storing private data.
 
 ## Architecture
