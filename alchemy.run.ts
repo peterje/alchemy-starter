@@ -13,6 +13,13 @@ export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
   memo: { include: ["**/*", "../../packages/contract/src/**"], lockfile: true },
   dev: { port: Config.Number("PORT").pipe(Config.withDefault(1337)) },
   env: { API: ApiWorker },
+  // Starts the trace that follows each request into the API Worker and its objects. Setting this
+  // replaces Alchemy's default, which keeps logs on, so logs are restated here.
+  observability: {
+    enabled: true,
+    logs: { enabled: true, invocationLogs: true },
+    traces: { enabled: true },
+  },
 }) {}
 
 export default Alchemy.Stack(

@@ -22,6 +22,8 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   "Api",
   {
     main: import.meta.url,
+    // Cloudflare.Telemetry needs tracing.startActiveSpan, which this date enables.
+    compatibility: { date: "2026-08-25" },
     workersDev: false,
     dev: { port: Config.Number("API_PORT").pipe(Config.withDefault(1338)) },
   },
@@ -126,5 +128,14 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
         HttpRouter.toHttpEffect,
       ),
     };
-  }).pipe(Effect.provide(Cloudflare.Hyperdrive.ConnectBinding)),
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        Cloudflare.Hyperdrive.ConnectBinding,
+        // Effect spans join Cloudflare's trace, which already follows the website Worker into
+        // this one and on into each Durable Object call. Cloudflare samples and exports it.
+        Cloudflare.Telemetry(),
+      ),
+    ),
+  ),
 ) {}
