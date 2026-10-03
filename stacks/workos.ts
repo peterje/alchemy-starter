@@ -60,7 +60,13 @@ export const providers = () =>
           if (output !== undefined && output.id !== registered.id) yield* remove(output.id);
           return registered;
         }).pipe(Effect.provide(workos)),
-      delete: ({ output }) => remove(output.id).pipe(Effect.provide(workos)),
+      // Deletes whatever WorkOS has registered for the URI now: it may have been removed and
+      // registered again under a new id since this resource last ran.
+      delete: ({ output }) =>
+        Effect.gen(function* () {
+          const registered = yield* find(output.uri);
+          if (Option.isSome(registered)) yield* remove(registered.value.id);
+        }).pipe(Effect.provide(workos)),
       list: () => Effect.succeed([]),
     }),
   );
