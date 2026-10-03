@@ -70,6 +70,11 @@ export const providers = () =>
           const registered = yield* find(output.uri);
           if (Option.isSome(registered)) yield* remove(registered.value.id);
         }).pipe(Effect.provide(workos)),
+      // Lets `alchemy drift --repair` notice a registration removed in the dashboard and restore it.
+      read: ({ output }) =>
+        output === undefined
+          ? Effect.succeed(undefined)
+          : find(output.uri).pipe(Effect.map(Option.getOrUndefined), Effect.provide(workos)),
       list: () => Effect.succeed([]),
     }),
   );

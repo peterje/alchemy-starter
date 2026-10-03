@@ -68,6 +68,8 @@ The workspace is split by runtime. `packages/contract` runs everywhere and depen
 
 People sign in with Google through [WorkOS AuthKit](https://workos.com/docs/authkit). AuthKit owns identities, the Google OAuth exchange, and sessions on its side; the API owns the session resource. `GET /api/auth/sign-in` sends the browser to AuthKit's page, which offers only Google and runs any step sign-in needs, such as verifying a new email; the callback exchanges the code, records the user, and sets a sealed, HttpOnly `session` cookie. Every endpoint behind `Authentication` verifies the access token inside it against WorkOS's signing keys and refreshes it when it expires. Signing out is deleting a session: `DELETE /api/sessions/current`, or another device's from `GET /api/sessions`. A revoked session's cookie keeps working until its short-lived access token expires, because tokens are checked without a call to WorkOS.
 
+A deployed stage's callback is registered by code, so leave the per-stage entries on WorkOS's Redirects page alone. If one is removed there, `bun alchemy drift --stage <stage> --repair` registers it again.
+
 Local runs and tests use WorkOS's own [emulator](https://github.com/workos/emulate), which `alchemy dev` starts, so they need no WorkOS account and leave nothing behind. Pull request previews use a WorkOS Staging environment, each registering its own callback URI, and production uses WorkOS Production.
 
 ## Postgres and preview deployments
