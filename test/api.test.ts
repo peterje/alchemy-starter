@@ -9,9 +9,6 @@ import {
 } from "@starter/contract/documents";
 import { type Deck, DeckId } from "@starter/contract/slides";
 import * as Cloudflare from "alchemy/Cloudflare";
-import * as Command from "alchemy/Command";
-import * as GitHub from "alchemy/GitHub";
-import * as Planetscale from "alchemy/Planetscale";
 import * as Test from "alchemy/Test/Bun";
 import { Config, Effect, Layer, Option, Result } from "effect";
 import {
@@ -24,19 +21,12 @@ import {
 } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
-import Stack from "../alchemy.run.ts";
-import * as WorkOS from "../stacks/workos.ts";
+import Stack, { providers } from "../alchemy.run.ts";
 
 // Deploy the real stack into local workerd: actual Durable Object SQLite databases, the stage's
 // own PlanetScale branch, and the WorkOS emulator that dev mode starts.
 const { test, beforeAll, deploy } = Test.make({
-  providers: Layer.mergeAll(
-    Cloudflare.providers(),
-    Command.providers(),
-    GitHub.providers(),
-    Planetscale.providers(),
-    WorkOS.providers(),
-  ),
+  providers,
   // Shared state, so the next CI run, and the cleanup job, find the stage this run left.
   state: Cloudflare.state(),
   dev: true,
@@ -138,7 +128,6 @@ test(
     yield* api.sessions.deleteCurrent();
     expect((yield* api.sessions.list()).map(({ id }) => id)).not.toContain(current.id);
   }),
-  { timeout: 120_000 },
 );
 
 test(
@@ -153,7 +142,6 @@ test(
     ).pipe(Effect.provide(manualRedirects));
     expect(forged.status).toBe(401);
   }),
-  { timeout: 120_000 },
 );
 
 test(
@@ -178,7 +166,6 @@ test(
     ).toMatchObject(refused);
     expect((yield* HttpClient.get(`${websiteUrl}/api/documents/${file.id}`)).status).toBe(401);
   }),
-  { timeout: 120_000 },
 );
 
 test(
@@ -264,7 +251,6 @@ test(
     );
     expect(Result.isFailure(missingApply) && missingApply.failure._tag).toBe("DocumentNotFound");
   }),
-  { timeout: 120_000 },
 );
 
 test(
@@ -296,7 +282,6 @@ test(
     const missing = yield* Effect.result(api.decks.get({ params: { deckId: unknown } }));
     expect(Result.isFailure(missing) && missing.failure._tag).toBe("DeckNotFound");
   }),
-  { timeout: 120_000 },
 );
 
 test(
@@ -333,5 +318,4 @@ test(
       expect(response.status).toBe(400);
     }
   }),
-  { timeout: 120_000 },
 );

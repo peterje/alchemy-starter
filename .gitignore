@@ -8,3 +8,4 @@ dist/
 *.tsbuildinfo
 playwright-report/
 test-results/
+!.env.example

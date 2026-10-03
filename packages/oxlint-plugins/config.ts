@@ -1,6 +1,8 @@
 export default {
   // Rule implementations walk untyped ASTs, so they cannot satisfy the rules they define.
   ignorePatterns: ["**/routeTree.gen.ts", "packages/oxlint-plugins/**"],
+  // Oxlint's defaults plus `import`, for `import/first`.
+  plugins: ["typescript", "unicorn", "oxc", "import"],
   jsPlugins: [
     {
       name: "workspace",
@@ -8,6 +10,7 @@ export default {
     },
   ],
   rules: {
+    "import/first": "error",
     "workspace/no-chained-type-assertions": "error",
     "workspace/no-conditional-empty-object-spread": "error",
     "workspace/no-known-value-widening": "error",
