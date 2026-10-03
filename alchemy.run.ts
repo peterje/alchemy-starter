@@ -5,6 +5,7 @@ import * as Output from "alchemy/Output";
 import * as Planetscale from "alchemy/Planetscale";
 import { Config, Effect, Layer } from "effect";
 
+import { region } from "./apps/api/src/database.ts";
 import ApiWorker from "./apps/api/src/worker.ts";
 
 export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
@@ -13,6 +14,9 @@ export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
   memo: { include: ["**/*", "../../packages/contract/src/**"], lockfile: true },
   dev: { port: Config.Number("PORT").pipe(Config.withDefault(1337)) },
   env: { API: ApiWorker },
+  // Server rendering calls the API, which queries Postgres, so render beside the database too.
+  // Static assets are still served from the edge.
+  placement: { region: region.workers },
   // Starts the trace that follows each request into the API Worker and its objects. Setting this
   // replaces Alchemy's default, which keeps logs on, so logs are restated here.
   observability: {
