@@ -96,7 +96,11 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
         },
         githubCallback: ({ query, request }) =>
           Effect.gen(function* () {
-            if (request.cookies[stateCookie] !== query.state) {
+            const expected = request.cookies[stateCookie];
+            if (expected !== query.state) {
+              yield* Effect.logWarning("Sign-in callback state does not match", {
+                stateCookie: expected === undefined ? "missing" : "different",
+              });
               return yield* Effect.fail(new HttpApiError.Unauthorized());
             }
             // The browser's address and user agent label the session in its user's device list.

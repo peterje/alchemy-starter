@@ -130,7 +130,11 @@ export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
           grant_type: "authorization_code",
           code,
           ...device,
-        }).pipe(Effect.mapError(unauthorized));
+        }).pipe(
+          // The browser only sees Unauthorized; the reason belongs in the logs.
+          Effect.tapCause((cause) => Effect.logWarning("WorkOS code exchange failed", cause)),
+          Effect.mapError(unauthorized),
+        );
         const { user } = result;
         const name = [user.first_name, user.last_name].filter(Boolean).join(" ");
         return {
