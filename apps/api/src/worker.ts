@@ -38,6 +38,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     const sql = yield* SQL.Postgres({
       url: postgres.connectionString,
       connectTimeout: "15 seconds",
+      prepare: false,
     });
     const userStores = yield* UserStore;
     const documents = yield* DocumentObject;
