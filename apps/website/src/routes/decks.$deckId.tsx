@@ -1,6 +1,6 @@
 import { useAtom, useAtomSuspense } from "@effect/atom-react";
-import { DocumentTitle } from "@starter/contract/documents";
-import { DeckId, type DeckOperation, type DeckOperationResult } from "@starter/contract/slides";
+import { DeckId, type DeckOperation, type DeckOperationResult } from "@starter/contract/decks";
+import { Title } from "@starter/contract/versioning";
 import { createFileRoute, useHydrated } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
@@ -65,7 +65,7 @@ function DeckView({ deckId }: Readonly<{ deckId: DeckId }>) {
       <form
         onSubmit={async (event) => {
           event.preventDefault();
-          const { title } = Schema.decodeUnknownSync(Schema.Struct({ title: DocumentTitle }))(
+          const { title } = Schema.decodeUnknownSync(Schema.Struct({ title: Title }))(
             Object.fromEntries(new FormData(event.currentTarget)),
           );
           await submit({ meta: { title } });
@@ -118,7 +118,7 @@ function DeckView({ deckId }: Readonly<{ deckId: DeckId }>) {
         onSubmit={async (event) => {
           event.preventDefault();
           const form = event.currentTarget;
-          const { title } = Schema.decodeUnknownSync(Schema.Struct({ title: DocumentTitle }))(
+          const { title } = Schema.decodeUnknownSync(Schema.Struct({ title: Title }))(
             Object.fromEntries(new FormData(form)),
           );
           const landed = await submit({

@@ -1,6 +1,6 @@
+import { type Deck, DeckId } from "@starter/contract/decks";
 import { type Document, DocumentId } from "@starter/contract/documents";
 import { FileRef } from "@starter/contract/files";
-import { type Deck, DeckId } from "@starter/contract/slides";
 import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Clock, Effect, Schema } from "effect";

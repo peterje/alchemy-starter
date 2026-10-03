@@ -3,5 +3,12 @@
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["*.ts", "stacks/**/*.ts", "test/**/*.ts", "packages/oxlint-plugins/**/*.ts"]
+  "include": [
+    "*.ts",
+    "stacks/**/*.ts",
+    "providers/**/*.ts",
+    "test/**/*.ts",
+    "packages/oxlint-plugins/**/*.ts",
+    "apps/**/*.test.ts"
+  ]
 }

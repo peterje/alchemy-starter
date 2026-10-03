@@ -1,9 +1,10 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
-import { Document, DocumentId, DocumentTitle } from "./documents.ts";
-import { Deck, DeckId } from "./slides.ts";
+import { Deck, DeckId } from "./decks.ts";
+import { Document, DocumentId } from "./documents.ts";
 import { Authentication } from "./user.ts";
+import { Title } from "./versioning.ts";
 
 /**
  * A user's files: pointers to the document and deck objects they created.
@@ -14,13 +15,13 @@ export const FileRef = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("document"),
     id: DocumentId,
-    title: DocumentTitle,
+    title: Title,
     createdAt: Schema.Natural,
   }),
   Schema.Struct({
     kind: Schema.Literal("deck"),
     id: DeckId,
-    title: DocumentTitle,
+    title: Title,
     createdAt: Schema.Natural,
   }),
 ]);

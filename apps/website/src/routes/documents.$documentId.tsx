@@ -4,9 +4,9 @@ import {
   DocumentId,
   type DocumentOperation,
   type DocumentOperationResult,
-  DocumentTitle,
   type ParagraphBlock,
 } from "@starter/contract/documents";
+import { Title } from "@starter/contract/versioning";
 import { createFileRoute, useHydrated } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
@@ -84,7 +84,7 @@ function Document({ documentId }: Readonly<{ documentId: DocumentId }>) {
       <form
         onSubmit={async (event) => {
           event.preventDefault();
-          const { title } = Schema.decodeUnknownSync(Schema.Struct({ title: DocumentTitle }))(
+          const { title } = Schema.decodeUnknownSync(Schema.Struct({ title: Title }))(
             Object.fromEntries(new FormData(event.currentTarget)),
           );
           await submit({ meta: { ...meta, title } });

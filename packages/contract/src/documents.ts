@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { Authentication } from "./user.ts";
-import { InvalidOperation, ItemId, VersionedFile } from "./versioning.ts";
+import { InvalidOperation, ItemId, Title, VersionedFile } from "./versioning.ts";
 
 /**
  * Structured document model for printable materials. Every block is explicit
@@ -248,9 +248,7 @@ export const Block = Schema.Union([
 ]);
 export type Block = typeof Block.Type;
 
-export const DocumentTitle = Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(200));
-
-export const DocumentMeta = Schema.Struct({ title: DocumentTitle, page: PageSettings });
+export const DocumentMeta = Schema.Struct({ title: Title, page: PageSettings });
 export type DocumentMeta = typeof DocumentMeta.Type;
 
 export const DocumentFile = VersionedFile(DocumentMeta, Block);

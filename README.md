@@ -1,6 +1,6 @@
 # Alchemy starter
 
-Fork this repository, open it in Claude Code, and say **set this up**. The agent follows the bootstrap guide in `AGENTS.md` from install to a production URL.
+Fork this repository, open it in Claude Code, and say **set this up**. The agent follows `docs/bootstrap.md` from install to a production URL.
 
 A small demo with **Effect, Alchemy, TanStack Start, PlanetScale Postgres, and WorkOS**. People sign in with Google; their accounts live in Postgres. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
 
@@ -13,58 +13,23 @@ The UI signs in with Google, lists each user's files, creates documents and deck
 ```bash
 bun install
 bun run dev                 # UI and /api at http://localhost:1337
-bun run check               # formatting, lint, types, lint-rule tests, build
-bun run test:integration    # deploy the stack to local workerd, test HTTP, destroy
+bun run check               # formatting, lint, types, lint-rule and unit tests, build
+bun run test:integration    # deploy the stack to local workerd and test HTTP
 bun run test:browser        # exercise the UI on a separate local stage and port
 bun run deploy              # deploy to Cloudflare
 ```
 
-Local Alchemy runs need Cloudflare and PlanetScale credentials: run `bun alchemy profile create` and connect both with OAuth. `bun run provision` creates the shared database once; the bootstrap guide in `AGENTS.md` covers the rest.
+Local Alchemy runs need Cloudflare and PlanetScale credentials: run `bun alchemy profile create` and connect both with OAuth. `bun run provision` creates the shared database once; `docs/bootstrap.md` covers the rest.
 
 ## Read the example
 
-| File                                                | Purpose                                                                                                         |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `alchemy.run.ts`                                    | Deploy the API Worker and the TanStack Start website                                                            |
-| `stacks/database.ts`                                | The shared Postgres database, deployed by CI on every merge                                                     |
-| `stacks/github.ts`                                  | CI's scoped Cloudflare token, deployed once under the `admin` profile                                           |
-| `stacks/workos.ts`                                  | The WorkOS redirect URI each deployed stage registers for its callback                                          |
-| `workos-emulate.config.yaml`                        | The emulator's users for local runs and tests: Alice and Bob                                                    |
-| `packages/contract/src/user.ts`                     | Users, sessions, the `Authentication` middleware, and the sign-in routes                                        |
-| `packages/contract/src/versioning.ts`               | Versioned files: items with versions, revisions, operations, results                                            |
-| `packages/contract/src/documents.ts`                | The document model: page settings, blocks, and its API group                                                    |
-| `packages/contract/src/slides.ts`                   | The slide deck model on the same versioning core, and its group                                                 |
-| `packages/contract/src/files.ts`                    | A user's file pointers and the group that creates and lists them                                                |
-| `packages/contract/src/api.ts`                      | The HttpApi that composes every feature group                                                                   |
-| `apps/api/src/database.ts`                          | The typed handle other stacks use to read the shared database                                                   |
-| `apps/api/src/auth.ts`                              | Sign-in through WorkOS: code exchange, sealed cookie, token checks, refresh, and the auth and sessions handlers |
-| `apps/api/src/postgres.ts`                          | The stage's PlanetScale branch, role, and Hyperdrive connection                                                 |
-| `apps/api/migrations/`                              | Postgres migrations, applied to every branch at deploy time                                                     |
-| `apps/api/src/user-store.ts`                        | One Durable Object per user: the index of their files                                                           |
-| `apps/api/src/versioned.ts`                         | The pure versioning core: apply an operation to a file's state                                                  |
-| `apps/api/src/document-object.ts`                   | One Durable Object per document                                                                                 |
-| `apps/api/src/deck-object.ts`                       | One Durable Object per slide deck                                                                               |
-| `apps/api/src/object-database.ts`                   | Service for an object's own SQLite: migrations and decoded queries                                              |
-| `apps/api/src/worker.ts`                            | The Worker that composes each module's services and handlers into the API                                       |
-| `apps/api/src/users.ts`                             | The `users` table and the `me` endpoint                                                                         |
-| `apps/api/src/files.ts`                             | The files, documents, and decks handlers, which call the objects                                                |
-| `apps/website/src/atoms.ts`                         | The AtomHttpApi client and the signed-in user atom shared by every route                                        |
-| `apps/website/src/routes/index.tsx`                 | A user's files, the create form, and the example starters                                                       |
-| `apps/website/src/routes/documents.$documentId.tsx` | One document: pages, rename, edit and add paragraphs                                                            |
-| `apps/website/src/routes/decks.$deckId.tsx`         | One deck: rename, add and delete slides                                                                         |
-| `apps/website/src/blocks.tsx`                       | Block renderers shared by the measuring pass and the pages                                                      |
-| `apps/website/src/document-pages.tsx`               | The paginated, print-faithful document viewer                                                                   |
-| `apps/website/src/document-layout.ts`               | Pure pagination over measured blocks                                                                            |
-| `apps/website/src/document-measure.ts`              | Reads block heights and break offsets from the offscreen copy                                                   |
-| `apps/website/src/slide-deck.tsx`                   | Real-size 16:9 slides scaled to fit the screen                                                                  |
-| `apps/website/src/math.ts`                          | LaTeX to KaTeX HTML                                                                                             |
-| `apps/website/src/examples.ts`                      | Example files that exercise every block kind and slide layout                                                   |
-| `apps/website/src/routes/__root.tsx`                | TanStack Start document and the account bar: sign in with Google, sign out                                      |
-| `apps/website/src/routes/api.$.ts`                  | Same-origin API route forwarding through an Alchemy service binding                                             |
-| `test/api.test.ts`                                  | Integration tests against actual Workers, objects, and Postgres                                                 |
-| `test/browser/files.pw.ts`                          | Playwright coverage of creating, editing, and paginating files                                                  |
+The workspace is split by runtime, and each feature cuts across it in the same places:
 
-The workspace is split by runtime. `packages/contract` runs everywhere and depends on Effect only. `apps/api` runs in workerd and depends on the contract and Alchemy. `apps/website` runs in the browser and SSR and depends on the contract and TanStack. The website never imports `@starter/api`; the Vite build fails if it does.
+- `packages/contract/src` is the schema-first contract the Worker and the browser share: one module per feature, composed in `api.ts`.
+- `apps/api/src` holds one module per feature with its services and handlers (start with `users.ts`), one file per Durable Object, and `worker.ts`, which only composes them.
+- `apps/website/src/routes` holds one route per page; `atoms.ts` holds the client every route reads.
+- `alchemy.run.ts` deploys each stage. `stacks/` holds the shared stacks `bun run provision` deploys once, and `providers/` holds custom Alchemy resources.
+- Pure logic is tested beside it (`versioned.test.ts`); `test/` deploys the stack to local workerd and tests the HTTP API, and `test/browser` drives the UI.
 
 ## Sign-in
 
@@ -82,7 +47,7 @@ Every stage gets its own [PlanetScale branch](https://planetscale.com/docs/postg
 
 The Worker reaches its branch through [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) with query caching off, so a read never returns a row from before the latest write; Hyperdrive still pools connections near the database. Queries use `@effect/sql-pg` through Alchemy's `SQL.Postgres`, which opens a pool on a request's first query and closes it when the request ends.
 
-Each pull request deploys to its own `pr-<number>` stage the moment it is pushed, without waiting for checks, and the stack comments the preview URL on the pull request. Verification runs beside it, each suite on a stage and branch of its own that later pushes reuse. Closing the pull request destroys all three. Branch protection, declared in `stacks/github.ts`, only lets a pull request merge once its checks pass against the latest `main`, so a merge deploys to production without running them again.
+Each pull request deploys to its own `pr-<number>` stage the moment it is pushed, without waiting for checks, and the stack comments the preview URL on the pull request. Verification runs beside it, each suite on a stage and branch of its own that later pushes reuse. Closing the pull request destroys all three. Branch protection, declared in `stacks/github.ts`, only lets a pull request merge once its checks pass, without making anyone rebase onto the latest `main`, so a merge deploys to production without running them again.
 
 ## Observability
 
@@ -116,10 +81,10 @@ For Postgres, add a numbered `.sql` file to `apps/api/migrations`. For an object
 
 Alchemy handles **DO class migrations** at deploy time. These are separate from the **per-instance SQL migrations** above. Deploying code does not eagerly migrate every object's database.
 
-See [Alchemy's integration testing tutorial](https://alchemy.run/cloudflare/tutorial/part-3/) for the `Test.make` → `beforeAll(deploy(Stack))` → HTTP assertions → `afterAll(destroy(Stack))` pattern. These tests use `dev: true` for actual local workerd SQLite, not a fake database.
+See [Alchemy's integration testing tutorial](https://alchemy.run/cloudflare/tutorial/part-3/) for the `Test.make` → `beforeAll(deploy(Stack))` → HTTP assertions pattern. These tests skip the tutorial's `afterAll(destroy(Stack))`: creating a database branch takes minutes, so the stage outlives the run and closing the pull request destroys it. They use `dev: true` for actual local workerd SQLite, not a fake database.
 
 ## Tooling
 
 The template keeps TypeScript strictness, Effect/React architecture lint rules in `packages/oxlint-plugins`, oxfmt, commit hooks, Playwright, and GitHub Actions. The browser build rejects server-only imports. No React `useState`/`useEffect` or additional client state library is needed.
 
-Changes reach `main` only through pull requests whose checks pass, each merge deploys to production, and every pull request gets a preview. `bun run provision` creates the shared database and CI's scoped Cloudflare token; the bootstrap guide in `AGENTS.md` walks through it.
+Changes reach `main` only through pull requests whose checks pass, each merge deploys to production, and every pull request gets a preview. `bun run provision` creates the shared database and CI's scoped Cloudflare token; `docs/bootstrap.md` walks through it.

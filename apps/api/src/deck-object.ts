@@ -5,7 +5,7 @@ import {
   type DeckOperation,
   DeckOperationResult,
   DeckState,
-} from "@starter/contract/slides";
+} from "@starter/contract/decks";
 import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Clock, Effect, Option, Schema } from "effect";

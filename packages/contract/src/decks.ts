@@ -2,7 +2,6 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import {
-  DocumentTitle,
   ImageBlock,
   Inline,
   ListBlock,
@@ -11,7 +10,7 @@ import {
   TableBlock,
 } from "./documents.ts";
 import { Authentication } from "./user.ts";
-import { InvalidOperation, ItemId, VersionedFile } from "./versioning.ts";
+import { InvalidOperation, ItemId, Title, VersionedFile } from "./versioning.ts";
 
 /**
  * A deck is an ordered list of slides. A slide holds the same content blocks
@@ -50,7 +49,7 @@ export const Slide = Schema.Struct({
 });
 export type Slide = typeof Slide.Type;
 
-export const DeckMeta = Schema.Struct({ title: DocumentTitle });
+export const DeckMeta = Schema.Struct({ title: Title });
 export type DeckMeta = typeof DeckMeta.Type;
 
 export const DeckFile = VersionedFile(DeckMeta, Slide);

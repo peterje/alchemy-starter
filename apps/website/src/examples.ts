@@ -1,3 +1,4 @@
+import type { Deck, Slide, SlideBlock } from "@starter/contract/decks";
 import type {
   Block,
   Document,
@@ -6,7 +7,6 @@ import type {
   ListItem,
   ParagraphBlock,
 } from "@starter/contract/documents";
-import type { Deck, Slide, SlideBlock } from "@starter/contract/slides";
 
 /**
  * Example files offered on the Files page. Between them they exercise every
