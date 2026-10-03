@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
@@ -39,5 +40,6 @@ const serverOnlyGuard: Plugin = {
 
 /** Vite and TanStack Start build configuration for the Cloudflare website. */
 export default defineConfig({
-  plugins: [serverOnlyGuard, tanstackStart(), viteReact()],
+  resolve: { tsconfigPaths: true },
+  plugins: [serverOnlyGuard, tailwindcss(), tanstackStart(), viteReact()],
 });

@@ -6,10 +6,10 @@ test("signing in with Google survives a reload, and signing out ends the session
   page,
 }) => {
   await signIn(page, "bob@example.com");
-  await expect(page.locator(".account")).toContainText("Bob");
+  await expect(page.getByText("Bob", { exact: true })).toBeVisible();
 
   await page.reload();
-  await expect(page.locator(".account")).toContainText("Bob");
+  await expect(page.getByText("Bob", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("link", { name: "Sign in with Google" })).toBeVisible();

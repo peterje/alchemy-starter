@@ -4,7 +4,7 @@ Fork this repository, open it in Claude Code, and say **set this up**. The agent
 
 A small demo with **Effect, Alchemy, TanStack Start, PlanetScale Postgres, and WorkOS**. People sign in with Google; their accounts live in Postgres. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
 
-The UI signs in with Google, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
+The UI is a chat app shell: a sidebar and an empty chat, not wired to an agent yet. It signs in with Google and, under Files, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
 
 **Every file belongs to whoever created it.** Each document and deck object records its owner and checks the signed-in user on every read and write; anyone else is told the file does not exist. Sharing files with other people is not built yet.
 
@@ -27,7 +27,7 @@ The workspace is split by runtime, and each feature cuts across it in the same p
 
 - `packages/contract/src` is the schema-first contract the Worker and the browser share: one module per feature, composed in `api.ts`.
 - `apps/api/src` holds one module per feature with its services and handlers (start with `users.ts`), one file per Durable Object, and `worker.ts`, which only composes them.
-- `apps/website/src/routes` holds one route per page; `atoms.ts` holds the client every route reads.
+- `apps/website/src/routes` holds one route per page; `atoms.ts` holds the client every route reads. `components/ui` holds shadcn's generated primitives and `components/` the app's own, such as the sidebar.
 - `alchemy.run.ts` deploys each stage. `stacks/` holds the shared stacks `bun run provision` deploys once, and `providers/` holds custom Alchemy resources.
 - Pure logic is tested beside it (`versioned.test.ts`); `test/` deploys the stack to local workerd and tests the HTTP API, and `test/browser` drives the UI.
 

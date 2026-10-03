@@ -2,6 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // Stacks that `bun run provision` and CI deploy by path.
   "workspaces": { ".": { "entry": ["stacks/*.ts"] } },
+  // shadcn components export their full API, including the parts this app does not use yet.
+  "ignore": ["apps/website/src/components/ui/**"],
   // Resource props are exported for callers even when only the resource type uses them today.
   "ignoreExportsUsedInFile": true,
   "ignoreDependencies": [

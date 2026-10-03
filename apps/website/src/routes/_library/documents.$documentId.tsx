@@ -12,10 +12,10 @@ import { Exit, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { Suspense } from "react";
 
-import { client } from "../atoms.ts";
-import { DocumentPages } from "../document-pages.tsx";
+import { client } from "@/atoms.ts";
+import { DocumentPages } from "@/document-pages.tsx";
 
-export const Route = createFileRoute("/documents/$documentId")({
+export const Route = createFileRoute("/_library/documents/$documentId")({
   // A malformed ID fails here, and the route renders DocumentUnavailable instead of the page.
   params: {
     parse: ({ documentId }) => ({ documentId: Schema.decodeUnknownSync(DocumentId)(documentId) }),

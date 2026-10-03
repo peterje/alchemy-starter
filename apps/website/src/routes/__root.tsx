@@ -1,74 +1,65 @@
-import { RegistryProvider, useAtom, useAtomSuspense } from "@effect/atom-react";
-import {
-  HeadContent,
-  Link,
-  Outlet,
-  Scripts,
-  createRootRoute,
-  useHydrated,
-} from "@tanstack/react-router";
-import { AsyncResult } from "effect/reactivity";
-import { type ReactNode, Suspense } from "react";
+import { RegistryProvider } from "@effect/atom-react";
+import { HeadContent, Outlet, Scripts, createRootRoute, useHydrated } from "@tanstack/react-router";
+import { PanelLeftCloseIcon, PanelLeftIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { client, meAtom } from "../atoms.ts";
+import { AppSidebar } from "@/components/app-sidebar.tsx";
+import { Button } from "@/components/ui/button";
+import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-import "../styles.css";
+import "@/app.css";
 
-const signOutAtom = client.mutation("sessions", "deleteCurrent");
-
-/** Root document route for the starter demo. */
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Alchemy + Effect starter" },
+      { title: "Starter Chat" },
     ],
   }),
-  // The Worker always emits this document. Page chrome lives here so the LCP
-  // heading is in the first HTML even when a child route is client-rendered.
   shellComponent: Document,
-  component: RootComponent,
+  component: App,
 });
 
-function RootComponent() {
+function App() {
   // The provider does not inherit the package default, which sweeps unused atoms after 400ms.
   return (
     <RegistryProvider defaultIdleTTL={400}>
-      <Suspense fallback={<p role="status">Loading your account…</p>}>
-        <Account />
-      </Suspense>
-      <Outlet />
+      <TooltipProvider>
+        <SidebarProvider>
+          <SidebarToggle />
+          <AppSidebar />
+          <SidebarInset className="h-dvh overflow-hidden">
+            <Outlet />
+          </SidebarInset>
+        </SidebarProvider>
+      </TooltipProvider>
     </RegistryProvider>
   );
 }
 
-function Account() {
+/**
+ * One toggle for the sidebar, pinned to the corner outside it, so it stays under the pointer
+ * whether the sidebar is open or closed.
+ */
+function SidebarToggle() {
   const hydrated = useHydrated();
-  const me = useAtomSuspense(meAtom, { includeFailure: true });
-  const [signingOut, signOut] = useAtom(signOutAtom, { mode: "promiseExit" });
-  // Signing in is a full-page navigation: Google and WorkOS redirect back to the callback, which
-  // creates the session cookie.
-  if (AsyncResult.isFailure(me)) {
-    return (
-      <p className="account">
-        <a className="button" href="/api/auth/sign-in">
-          Sign in with Google
-        </a>
-      </p>
-    );
-  }
+  const { open, openMobile, isMobile, toggleSidebar } = useSidebar();
+  const visible = isMobile ? openMobile : open;
   return (
-    <p className="account">
-      Signed in as <strong>{me.value.name}</strong>
-      <button
-        type="button"
-        disabled={!hydrated || AsyncResult.isWaiting(signingOut)}
-        onClick={() => signOut({ reactivityKeys: ["me", "files"] })}
-      >
-        Sign out
-      </button>
-    </p>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Toggle sidebar"
+      aria-pressed={visible}
+      // Server-rendered markup has no click handler until React hydrates it.
+      disabled={!hydrated}
+      onClick={toggleSidebar}
+      className="fixed top-3 left-3 z-50"
+    >
+      {visible ? <PanelLeftCloseIcon /> : <PanelLeftIcon />}
+    </Button>
   );
 }
 
@@ -78,18 +69,8 @@ function Document({ children }: Readonly<{ children: ReactNode }>) {
       <head>
         <HeadContent />
       </head>
-      <body>
-        <main>
-          <p className="eyebrow">
-            <Link to="/">Alchemy + Effect starter</Link>
-          </p>
-          <h1>Every document and deck is an object.</h1>
-          <p>
-            Each file is a Durable Object with its own SQLite database and a single writer. Each
-            user's object indexes the files they created. No ORM.
-          </p>
-          {children}
-        </main>
+      <body className="antialiased">
+        {children}
         <Scripts />
       </body>
     </html>
