@@ -50,7 +50,7 @@ export interface Device {
 }
 
 /**
- * Sign-in through WorkOS AuthKit with Google, and the sessions that follow it. `WORKOS_API_URL`
+ * Sign-in with Google through WorkOS, and the sessions that follow it. `WORKOS_API_URL`
  * points local runs and tests at the WorkOS emulator; deployed stages use the real API.
  */
 export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
@@ -104,8 +104,8 @@ export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
 
     return {
       /**
-       * Sends the browser to AuthKit's sign-in page, configured to offer only Google. The page stays
-       * in the flow because AuthKit runs the steps around sign-in, such as verifying an email.
+       * Sends the browser straight to Google. The app's own `/sign-in` page stands in for AuthKit's
+       * hosted one, so sign-in looks the same wherever it runs.
        */
       authorizeUrl: ({ redirectUri, state }: { redirectUri: string; state: string }) => {
         const url = new URL("/user_management/authorize", apiUrl);
@@ -113,7 +113,7 @@ export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
           client_id: clientId,
           redirect_uri: redirectUri,
           response_type: "code",
-          provider: "authkit",
+          provider: "GoogleOAuth",
           state,
         }).toString();
         return url.toString();
@@ -262,8 +262,10 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", (handlers) =>
       },
       callback: ({ query, request }) =>
         Effect.gen(function* () {
+          // Google and WorkOS return without a code when someone cancels or sign-in fails.
+          if (query.code === undefined) return yield* Effect.fail(new HttpApiError.Unauthorized());
           const expected = request.cookies[stateCookie];
-          if (expected !== query.state) {
+          if (expected === undefined || expected !== query.state) {
             yield* Effect.logWarning("Sign-in callback state does not match", {
               stateCookie: expected === undefined ? "missing" : "different",
             });
@@ -280,12 +282,20 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", (handlers) =>
           yield* users.save(user);
           return HttpServerResponse.redirect("/", { status: 302 }).pipe(
             HttpServerResponse.setCookieUnsafe(sessionCookie.key, sealed, sessionCookieOptions),
+          );
+        }).pipe(
+          // A browser lands here, so a failed sign-in returns to the sign-in page to try again.
+          Effect.catchTag("Unauthorized", () =>
+            Effect.succeed(HttpServerResponse.redirect("/sign-in?error=failed", { status: 302 })),
+          ),
+          // The state is single-use whichever way sign-in ended.
+          Effect.map(
             HttpServerResponse.setCookieUnsafe(stateCookie, "", {
               ...stateCookieOptions,
               maxAge: 0,
             }),
-          );
-        }),
+          ),
+        ),
     });
   }),
 );

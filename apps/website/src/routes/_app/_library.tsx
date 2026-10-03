@@ -3,7 +3,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import "@/library.css";
 
 /** The document and deck library, laid out as a page of its own inside the app. */
-export const Route = createFileRoute("/_library")({ component: LibraryLayout });
+export const Route = createFileRoute("/_app/_library")({ component: LibraryLayout });
 
 function LibraryLayout() {
   return (

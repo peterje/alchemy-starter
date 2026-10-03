@@ -4,7 +4,7 @@ import { ArrowUpIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-export const Route = createFileRoute("/")({ component: NewChat });
+export const Route = createFileRoute("/_app/")({ component: NewChat });
 
 /** An empty chat. Sending is not wired up yet, so the composer only shows where it will go. */
 function NewChat() {

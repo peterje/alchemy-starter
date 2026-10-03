@@ -86,16 +86,11 @@ function Account() {
   const hydrated = useHydrated();
   const me = useAtomSuspense(meAtom, { includeFailure: true });
   const [signingOut, signOut] = useAtom(signOutAtom, { mode: "promiseExit" });
-  // Signing in is a full-page navigation: Google and WorkOS redirect back to the callback, which
-  // creates the session cookie.
   if (AsyncResult.isFailure(me)) {
     return (
-      <a
-        href="/api/auth/sign-in"
-        className={buttonVariants({ variant: "outline", className: "flex-1" })}
-      >
-        Sign in with Google
-      </a>
+      <Link to="/sign-in" className={buttonVariants({ variant: "outline", className: "flex-1" })}>
+        Sign in
+      </Link>
     );
   }
   return (
