@@ -186,57 +186,67 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     const documentsGroup = HttpApiBuilder.group(Api, "documents", (handlers) =>
       handlers.handleAll({
         get: ({ params }) =>
-          documents
-            .getByName(params.documentId)
-            .get()
-            .pipe(
-              Effect.catchTag("DocumentNotFound", (error) =>
-                Effect.fail(new DocumentNotFound({ id: error.id })),
-              ),
+          Effect.flatMap(CurrentUser, ({ id }) =>
+            documents.getByName(params.documentId).get({ userId: id }),
+          ).pipe(
+            Effect.catchTag("DocumentNotFound", (error) =>
+              Effect.fail(new DocumentNotFound({ id: error.id })),
             ),
-        set: ({ params, payload }) => documents.getByName(params.documentId).set(payload),
+          ),
+        set: ({ params, payload }) =>
+          Effect.flatMap(CurrentUser, ({ id }) =>
+            documents.getByName(params.documentId).set({ userId: id, document: payload }),
+          ).pipe(
+            Effect.catchTag("DocumentNotFound", (error) =>
+              Effect.fail(new DocumentNotFound({ id: error.id })),
+            ),
+          ),
         apply: ({ params, payload }) =>
-          documents
-            .getByName(params.documentId)
-            .apply(payload)
-            .pipe(
-              Effect.catchTag("DocumentNotFound", (error) =>
-                Effect.fail(new DocumentNotFound({ id: error.id })),
-              ),
-              Effect.catchTag("InvalidOperation", (error) =>
-                Effect.fail(
-                  new InvalidOperation({ operationId: error.operationId, message: error.message }),
-                ),
+          Effect.flatMap(CurrentUser, ({ id }) =>
+            documents.getByName(params.documentId).apply({ userId: id, operation: payload }),
+          ).pipe(
+            Effect.catchTag("DocumentNotFound", (error) =>
+              Effect.fail(new DocumentNotFound({ id: error.id })),
+            ),
+            Effect.catchTag("InvalidOperation", (error) =>
+              Effect.fail(
+                new InvalidOperation({ operationId: error.operationId, message: error.message }),
               ),
             ),
+          ),
       }),
     );
     const decksGroup = HttpApiBuilder.group(Api, "decks", (handlers) =>
       handlers.handleAll({
         get: ({ params }) =>
-          decks
-            .getByName(params.deckId)
-            .get()
-            .pipe(
-              Effect.catchTag("DeckNotFound", (error) =>
-                Effect.fail(new DeckNotFound({ id: error.id })),
-              ),
+          Effect.flatMap(CurrentUser, ({ id }) =>
+            decks.getByName(params.deckId).get({ userId: id }),
+          ).pipe(
+            Effect.catchTag("DeckNotFound", (error) =>
+              Effect.fail(new DeckNotFound({ id: error.id })),
             ),
-        set: ({ params, payload }) => decks.getByName(params.deckId).set(payload),
+          ),
+        set: ({ params, payload }) =>
+          Effect.flatMap(CurrentUser, ({ id }) =>
+            decks.getByName(params.deckId).set({ userId: id, deck: payload }),
+          ).pipe(
+            Effect.catchTag("DeckNotFound", (error) =>
+              Effect.fail(new DeckNotFound({ id: error.id })),
+            ),
+          ),
         apply: ({ params, payload }) =>
-          decks
-            .getByName(params.deckId)
-            .apply(payload)
-            .pipe(
-              Effect.catchTag("DeckNotFound", (error) =>
-                Effect.fail(new DeckNotFound({ id: error.id })),
-              ),
-              Effect.catchTag("InvalidOperation", (error) =>
-                Effect.fail(
-                  new InvalidOperation({ operationId: error.operationId, message: error.message }),
-                ),
+          Effect.flatMap(CurrentUser, ({ id }) =>
+            decks.getByName(params.deckId).apply({ userId: id, operation: payload }),
+          ).pipe(
+            Effect.catchTag("DeckNotFound", (error) =>
+              Effect.fail(new DeckNotFound({ id: error.id })),
+            ),
+            Effect.catchTag("InvalidOperation", (error) =>
+              Effect.fail(
+                new InvalidOperation({ operationId: error.operationId, message: error.message }),
               ),
             ),
+          ),
       }),
     );
     return {

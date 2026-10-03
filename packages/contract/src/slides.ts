@@ -10,6 +10,7 @@ import {
   ParagraphBlock,
   TableBlock,
 } from "./documents.ts";
+import { Authentication } from "./user.ts";
 import { InvalidOperation, ItemId, VersionedFile } from "./versioning.ts";
 
 /**
@@ -80,6 +81,7 @@ export class DecksGroup extends HttpApiGroup.make("decks")
       params: { deckId: DeckId },
       payload: Deck,
       success: DeckState,
+      error: DeckNotFound,
     }),
     HttpApiEndpoint.post("apply", "/operations", {
       params: { deckId: DeckId },
@@ -88,4 +90,5 @@ export class DecksGroup extends HttpApiGroup.make("decks")
       error: [DeckNotFound, InvalidOperation],
     }),
   )
+  .middleware(Authentication)
   .prefix("/decks/:deckId") {}

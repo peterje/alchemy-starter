@@ -6,6 +6,7 @@ import {
   DeckOperationResult,
   DeckState,
 } from "@starter/contract/slides";
+import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Clock, Effect, Option, Schema } from "effect";
 
@@ -17,6 +18,7 @@ import { applyItemOperation } from "./versioned.ts";
 const migrations = [
   "CREATE TABLE deck (id INTEGER PRIMARY KEY CHECK (id = 1), state TEXT NOT NULL)",
   "CREATE TABLE operations (operation_id TEXT PRIMARY KEY, result TEXT NOT NULL, applied_at INTEGER NOT NULL)",
+  "CREATE TABLE owner (id INTEGER PRIMARY KEY CHECK (id = 1), user_id TEXT NOT NULL)",
 ];
 
 /** Operation results are kept for replay; older ones are pruned so the table stays bounded. */
@@ -24,6 +26,7 @@ const OPERATION_HISTORY_LIMIT = 1_000;
 
 const DeckRow = Schema.Struct({ state: Schema.fromJsonString(DeckState) });
 const ResultRow = Schema.Struct({ result: Schema.fromJsonString(DeckOperationResult) });
+const OwnerRow = Schema.Struct({ userId: UserId });
 
 /** One object per deck: the single writer for its slides and its operation log. */
 export default class DeckObject extends Cloudflare.DurableObject<DeckObject>()(
@@ -44,30 +47,74 @@ export default class DeckObject extends Cloudflare.DurableObject<DeckObject>()(
           values: [JSON.stringify(deck)],
         });
 
+      // Only the user who created the file reaches it; anyone else is told it does not exist.
+      const authorize = Effect.fn("DeckObject.authorize")(function* (userId: UserId) {
+        const owner = yield* db.queryFirst({
+          schema: OwnerRow,
+          sql: "SELECT user_id AS userId FROM owner",
+        });
+        if (Option.isNone(owner) || owner.value.userId !== userId) {
+          return yield* Effect.fail(new DeckNotFound({ id }));
+        }
+      });
+      const replace = Effect.fn("DeckObject.replace")(function* (deck: Deck) {
+        const row = yield* read;
+        const next: DeckState = {
+          meta: deck.meta,
+          revision: (Option.isSome(row) ? row.value.state.revision : 0) + 1,
+          items: deck.items.map((item) => ({ version: 1, item })),
+        };
+        yield* db.transaction(
+          Effect.gen(function* () {
+            yield* write(next);
+            yield* db.execute({ sql: "DELETE FROM operations" });
+          }),
+        );
+        return next;
+      });
+
       return {
-        get: Effect.fn("DeckObject.get")(function* () {
+        get: Effect.fn("DeckObject.get")(function* ({ userId }: { userId: UserId }) {
+          yield* authorize(userId);
           const row = yield* read;
           if (Option.isNone(row)) return yield* Effect.fail(new DeckNotFound({ id }));
           return row.value.state;
         }),
         /** Replace the whole deck: new revision, every slide back to version 1, replay history cleared. */
-        set: Effect.fn("DeckObject.set")(function* (deck: Deck) {
-          const row = yield* read;
-          const next: DeckState = {
-            meta: deck.meta,
-            revision: (Option.isSome(row) ? row.value.state.revision : 0) + 1,
-            items: deck.items.map((item) => ({ version: 1, item })),
-          };
-          yield* db.transaction(
-            Effect.gen(function* () {
-              yield* write(next);
-              yield* db.execute({ sql: "DELETE FROM operations" });
-            }),
-          );
-          return next;
+        set: Effect.fn("DeckObject.set")(function* ({
+          userId,
+          deck,
+        }: {
+          userId: UserId;
+          deck: Deck;
+        }) {
+          yield* authorize(userId);
+          return yield* replace(deck);
+        }),
+        /** Records the owner and the first content; the owner's file index calls this once. */
+        create: Effect.fn("DeckObject.create")(function* ({
+          owner,
+          deck,
+        }: {
+          owner: UserId;
+          deck: Deck;
+        }) {
+          yield* db.execute({
+            sql: "INSERT INTO owner (id, user_id) VALUES (1, ?) ON CONFLICT (id) DO NOTHING",
+            values: [owner],
+          });
+          yield* authorize(owner);
+          return yield* replace(deck);
         }),
         /** Replaying an operation ID returns its original result. */
-        apply: Effect.fn("DeckObject.apply")(function* (operation: DeckOperation) {
+        apply: Effect.fn("DeckObject.apply")(function* ({
+          userId,
+          operation,
+        }: {
+          userId: UserId;
+          operation: DeckOperation;
+        }) {
+          yield* authorize(userId);
           const replay = yield* db.queryFirst({
             schema: ResultRow,
             sql: "SELECT result FROM operations WHERE operation_id = ?",

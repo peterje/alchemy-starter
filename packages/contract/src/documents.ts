@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
+import { Authentication } from "./user.ts";
 import { InvalidOperation, ItemId, VersionedFile } from "./versioning.ts";
 
 /**
@@ -281,6 +282,7 @@ export class DocumentsGroup extends HttpApiGroup.make("documents")
       params: { documentId: DocumentId },
       payload: Document,
       success: DocumentState,
+      error: DocumentNotFound,
     }),
     HttpApiEndpoint.post("apply", "/operations", {
       params: { documentId: DocumentId },
@@ -289,4 +291,5 @@ export class DocumentsGroup extends HttpApiGroup.make("documents")
       error: [DocumentNotFound, InvalidOperation],
     }),
   )
+  .middleware(Authentication)
   .prefix("/documents/:documentId") {}
