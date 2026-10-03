@@ -58,7 +58,7 @@ export default Alchemy.Stack(
     // A deployed stage registers its own callback, so sign-in returns to the stage it started on.
     if (!emulated) {
       yield* WorkOS.RedirectUri("SignInCallback", {
-        uri: Output.interpolate`${website.url}/api/auth/callback`,
+        uri: Output.interpolate`${website.url}/api/auth/github/callback`,
       });
     }
 
