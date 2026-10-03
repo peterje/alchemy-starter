@@ -9,7 +9,7 @@ import { Suspense } from "react";
 import { client } from "@/atoms.ts";
 import { Deck, SlideView } from "@/slide-deck.tsx";
 
-export const Route = createFileRoute("/_library/decks/$deckId")({
+export const Route = createFileRoute("/_app/_library/decks/$deckId")({
   // A malformed ID fails here, and the route renders DeckUnavailable instead of the page.
   params: {
     parse: ({ deckId }) => ({ deckId: Schema.decodeUnknownSync(DeckId)(deckId) }),

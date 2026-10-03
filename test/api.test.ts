@@ -140,7 +140,9 @@ test(
     const forged = yield* HttpClient.get(
       `${websiteUrl}/api/auth/callback?code=stolen&state=guessed`,
     ).pipe(Effect.provide(manualRedirects));
-    expect(forged.status).toBe(401);
+    expect(forged.status).toBe(302);
+    expect(forged.headers["location"]).toBe("/sign-in?error=failed");
+    expect(Cookies.getValue(forged.cookies, "session")).toEqual(Option.none());
   }),
 );
 

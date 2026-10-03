@@ -10,7 +10,7 @@ import { Suspense } from "react";
 import { client, meAtom } from "@/atoms.ts";
 import { algebraWorksheet, geometryQuiz, linearEquationsLesson } from "@/examples.ts";
 
-export const Route = createFileRoute("/_library/files")({ component: FilesPage });
+export const Route = createFileRoute("/_app/_library/files")({ component: FilesPage });
 
 const filesAtom = client.query("files", "list", { reactivityKeys: ["files"] });
 const createDocumentAtom = client.mutation("files", "createDocument");

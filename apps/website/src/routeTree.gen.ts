@@ -9,104 +9,139 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LibraryRouteImport } from './routes/_library'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
-import { Route as LibraryFilesRouteImport } from './routes/_library/files'
-import { Route as LibraryDocumentsDocumentIdRouteImport } from './routes/_library/documents.$documentId'
-import { Route as LibraryDecksDeckIdRouteImport } from './routes/_library/decks.$deckId'
+import { Route as AppLibraryRouteImport } from './routes/_app/_library'
+import { Route as AppLibraryFilesRouteImport } from './routes/_app/_library/files'
+import { Route as AppLibraryDocumentsDocumentIdRouteImport } from './routes/_app/_library/documents.$documentId'
+import { Route as AppLibraryDecksDeckIdRouteImport } from './routes/_app/_library/decks.$deckId'
 
-const LibraryRoute = LibraryRouteImport.update({
-  id: '/_library',
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LibraryFilesRoute = LibraryFilesRouteImport.update({
+const AppLibraryRoute = AppLibraryRouteImport.update({
+  id: '/_library',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLibraryFilesRoute = AppLibraryFilesRouteImport.update({
   id: '/files',
   path: '/files',
-  getParentRoute: () => LibraryRoute,
+  getParentRoute: () => AppLibraryRoute,
 } as any)
-const LibraryDocumentsDocumentIdRoute =
-  LibraryDocumentsDocumentIdRouteImport.update({
+const AppLibraryDocumentsDocumentIdRoute =
+  AppLibraryDocumentsDocumentIdRouteImport.update({
     id: '/documents/$documentId',
     path: '/documents/$documentId',
-    getParentRoute: () => LibraryRoute,
+    getParentRoute: () => AppLibraryRoute,
   } as any)
-const LibraryDecksDeckIdRoute = LibraryDecksDeckIdRouteImport.update({
+const AppLibraryDecksDeckIdRoute = AppLibraryDecksDeckIdRouteImport.update({
   id: '/decks/$deckId',
   path: '/decks/$deckId',
-  getParentRoute: () => LibraryRoute,
+  getParentRoute: () => AppLibraryRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/files': typeof LibraryFilesRoute
+  '/': typeof AppIndexRoute
+  '/sign-in': typeof SignInRoute
   '/api/$': typeof ApiSplatRoute
-  '/decks/$deckId': typeof LibraryDecksDeckIdRoute
-  '/documents/$documentId': typeof LibraryDocumentsDocumentIdRoute
+  '/files': typeof AppLibraryFilesRoute
+  '/decks/$deckId': typeof AppLibraryDecksDeckIdRoute
+  '/documents/$documentId': typeof AppLibraryDocumentsDocumentIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/files': typeof LibraryFilesRoute
+  '/sign-in': typeof SignInRoute
+  '/': typeof AppIndexRoute
   '/api/$': typeof ApiSplatRoute
-  '/decks/$deckId': typeof LibraryDecksDeckIdRoute
-  '/documents/$documentId': typeof LibraryDocumentsDocumentIdRoute
+  '/files': typeof AppLibraryFilesRoute
+  '/decks/$deckId': typeof AppLibraryDecksDeckIdRoute
+  '/documents/$documentId': typeof AppLibraryDocumentsDocumentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/_library': typeof LibraryRouteWithChildren
-  '/_library/files': typeof LibraryFilesRoute
+  '/_app': typeof AppRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/_app/_library': typeof AppLibraryRouteWithChildren
   '/api/$': typeof ApiSplatRoute
-  '/_library/decks/$deckId': typeof LibraryDecksDeckIdRoute
-  '/_library/documents/$documentId': typeof LibraryDocumentsDocumentIdRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/_library/files': typeof AppLibraryFilesRoute
+  '/_app/_library/decks/$deckId': typeof AppLibraryDecksDeckIdRoute
+  '/_app/_library/documents/$documentId': typeof AppLibraryDocumentsDocumentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/files' | '/api/$' | '/decks/$deckId' | '/documents/$documentId'
+    | '/'
+    | '/sign-in'
+    | '/api/$'
+    | '/files'
+    | '/decks/$deckId'
+    | '/documents/$documentId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/files' | '/api/$' | '/decks/$deckId' | '/documents/$documentId'
+  to:
+    | '/sign-in'
+    | '/'
+    | '/api/$'
+    | '/files'
+    | '/decks/$deckId'
+    | '/documents/$documentId'
   id:
     | '__root__'
-    | '/'
-    | '/_library'
-    | '/_library/files'
+    | '/_app'
+    | '/sign-in'
+    | '/_app/_library'
     | '/api/$'
-    | '/_library/decks/$deckId'
-    | '/_library/documents/$documentId'
+    | '/_app/'
+    | '/_app/_library/files'
+    | '/_app/_library/decks/$deckId'
+    | '/_app/_library/documents/$documentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  LibraryRoute: typeof LibraryRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
+  SignInRoute: typeof SignInRoute
   ApiSplatRoute: typeof ApiSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_library': {
-      id: '/_library'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof LibraryRouteImport
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
     }
     '/api/$': {
       id: '/api/$'
@@ -115,48 +150,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_library/files': {
-      id: '/_library/files'
+    '/_app/_library': {
+      id: '/_app/_library'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppLibraryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/_library/files': {
+      id: '/_app/_library/files'
       path: '/files'
       fullPath: '/files'
-      preLoaderRoute: typeof LibraryFilesRouteImport
-      parentRoute: typeof LibraryRoute
+      preLoaderRoute: typeof AppLibraryFilesRouteImport
+      parentRoute: typeof AppLibraryRoute
     }
-    '/_library/documents/$documentId': {
-      id: '/_library/documents/$documentId'
+    '/_app/_library/documents/$documentId': {
+      id: '/_app/_library/documents/$documentId'
       path: '/documents/$documentId'
       fullPath: '/documents/$documentId'
-      preLoaderRoute: typeof LibraryDocumentsDocumentIdRouteImport
-      parentRoute: typeof LibraryRoute
+      preLoaderRoute: typeof AppLibraryDocumentsDocumentIdRouteImport
+      parentRoute: typeof AppLibraryRoute
     }
-    '/_library/decks/$deckId': {
-      id: '/_library/decks/$deckId'
+    '/_app/_library/decks/$deckId': {
+      id: '/_app/_library/decks/$deckId'
       path: '/decks/$deckId'
       fullPath: '/decks/$deckId'
-      preLoaderRoute: typeof LibraryDecksDeckIdRouteImport
-      parentRoute: typeof LibraryRoute
+      preLoaderRoute: typeof AppLibraryDecksDeckIdRouteImport
+      parentRoute: typeof AppLibraryRoute
     }
   }
 }
 
-interface LibraryRouteChildren {
-  LibraryFilesRoute: typeof LibraryFilesRoute
-  LibraryDecksDeckIdRoute: typeof LibraryDecksDeckIdRoute
-  LibraryDocumentsDocumentIdRoute: typeof LibraryDocumentsDocumentIdRoute
+interface AppLibraryRouteChildren {
+  AppLibraryFilesRoute: typeof AppLibraryFilesRoute
+  AppLibraryDecksDeckIdRoute: typeof AppLibraryDecksDeckIdRoute
+  AppLibraryDocumentsDocumentIdRoute: typeof AppLibraryDocumentsDocumentIdRoute
 }
 
-const LibraryRouteChildren: LibraryRouteChildren = {
-  LibraryFilesRoute: LibraryFilesRoute,
-  LibraryDecksDeckIdRoute: LibraryDecksDeckIdRoute,
-  LibraryDocumentsDocumentIdRoute: LibraryDocumentsDocumentIdRoute,
+const AppLibraryRouteChildren: AppLibraryRouteChildren = {
+  AppLibraryFilesRoute: AppLibraryFilesRoute,
+  AppLibraryDecksDeckIdRoute: AppLibraryDecksDeckIdRoute,
+  AppLibraryDocumentsDocumentIdRoute: AppLibraryDocumentsDocumentIdRoute,
 }
 
-const LibraryRouteWithChildren =
-  LibraryRoute._addFileChildren(LibraryRouteChildren)
+const AppLibraryRouteWithChildren = AppLibraryRoute._addFileChildren(
+  AppLibraryRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppLibraryRoute: typeof AppLibraryRouteWithChildren
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppLibraryRoute: AppLibraryRouteWithChildren,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  LibraryRoute: LibraryRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
+  SignInRoute: SignInRoute,
   ApiSplatRoute: ApiSplatRoute,
 }
 export const routeTree = rootRouteImport
