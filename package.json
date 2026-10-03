@@ -17,7 +17,7 @@
     "prepare": "lefthook install",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "lint": "bun --bun oxlint .",
+    "lint": "bun --bun oxlint --deny-warnings .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.bun.json",
     "test:plugins": "node --experimental-strip-types --test packages/oxlint-plugins/*.rule.ts",
     "test:integration": "WORKOS_API_URL=http://localhost:4102 bun test test",

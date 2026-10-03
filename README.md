@@ -102,7 +102,7 @@ A document is page settings plus an ordered list of blocks; a deck is a title pl
 
 `DocumentObject` and `DeckObject` are one object per file. Each is the single writer for its content and its operation log, so concurrent edits serialize without locks and every conflict check reads consistent state. `UserStore` is one object per user and holds only an index of the files they created, which is what makes "each user has many files" answerable without a global table.
 
-Creating a file writes to both. The file's write is authoritative and the user's row is idempotent, so a retry after a partial failure converges. The user's object calls the file's object through Alchemy's typed stub.
+Creating a file writes to both. The file's object is written first, so a failure between the writes leaves an object nobody can reach, never a pointer to a missing file. The user's object calls the file's object through Alchemy's typed stub.
 
 Objects expose RPC methods only, which is what Cloudflare recommends over `fetch` handlers. The Worker serves the whole `HttpApi` and implements each endpoint by calling a method on the right object; validation, status codes, and error encoding happen once, in the Worker. A typed failure raised inside an object crosses the stub as a plain tagged object, so each Worker handler catches the tag and rebuilds the class before the API encodes it.
 
