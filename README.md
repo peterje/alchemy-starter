@@ -2,11 +2,11 @@
 
 Fork this repository, open it in Claude Code, and say **set this up**. The agent follows the bootstrap guide in `AGENTS.md` from install to a production URL.
 
-A small demo with **Effect, Alchemy, TanStack Start, and PlanetScale Postgres**. Users live in Postgres. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
+A small demo with **Effect, Alchemy, TanStack Start, PlanetScale Postgres, and WorkOS**. People sign in with Google; their accounts live in Postgres. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
 
-The UI switches between users stored in Postgres, adds new ones, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
+The UI signs in with Google, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
 
-**This is a public demo, not an authenticated app.** The selected user ID controls routing. Before storing private data, authenticate requests and take the user from the verified session instead of the client.
+**Files are not yet authorized individually.** Signing in decides whose file list you see, but a document or deck is reachable by anyone holding its link. Check ownership on each file before storing private data.
 
 ## Run
 
@@ -23,50 +23,58 @@ Local Alchemy runs need Cloudflare and PlanetScale credentials: run `bun alchemy
 
 ## Read the example
 
-| File                                                | Purpose                                                               |
-| --------------------------------------------------- | --------------------------------------------------------------------- |
-| `alchemy.run.ts`                                    | Deploy the API Worker and the TanStack Start website                  |
-| `stacks/database.ts`                                | The shared Postgres database, deployed by CI on every merge           |
-| `stacks/github.ts`                                  | CI's scoped Cloudflare token, deployed once under the `admin` profile |
-| `packages/contract/src/user.ts`                     | Users: the ID that selects an object, and the Postgres-backed group   |
-| `packages/contract/src/versioning.ts`               | Versioned files: items with versions, revisions, operations, results  |
-| `packages/contract/src/documents.ts`                | The document model: page settings, blocks, and its API group          |
-| `packages/contract/src/slides.ts`                   | The slide deck model on the same versioning core, and its group       |
-| `packages/contract/src/files.ts`                    | A user's file pointers and the group that creates and lists them      |
-| `packages/contract/src/api.ts`                      | The HttpApi that composes every feature group                         |
-| `apps/api/src/database.ts`                          | The typed handle other stacks use to read the shared database         |
-| `apps/api/src/postgres.ts`                          | The stage's PlanetScale branch, role, and Hyperdrive connection       |
-| `apps/api/migrations/`                              | Postgres migrations, applied to every branch at deploy time           |
-| `apps/api/seed.sql`                                 | The demo users, re-applied whenever the file changes                  |
-| `apps/api/src/user-store.ts`                        | One Durable Object per user: the index of their files                 |
-| `apps/api/src/versioned.ts`                         | The pure versioning core: apply an operation to a file's state        |
-| `apps/api/src/document-object.ts`                   | One Durable Object per document                                       |
-| `apps/api/src/deck-object.ts`                       | One Durable Object per slide deck                                     |
-| `apps/api/src/object-database.ts`                   | Service for an object's own SQLite: migrations and decoded queries    |
-| `apps/api/src/worker.ts`                            | The Worker that serves the API from Postgres and the objects          |
-| `apps/website/src/atoms.ts`                         | The AtomHttpApi client and demo user atom shared by every route       |
-| `apps/website/src/routes/index.tsx`                 | A user's files, the create form, and the example starters             |
-| `apps/website/src/routes/documents.$documentId.tsx` | One document: pages, rename, edit and add paragraphs                  |
-| `apps/website/src/routes/decks.$deckId.tsx`         | One deck: rename, add and delete slides                               |
-| `apps/website/src/blocks.tsx`                       | Block renderers shared by the measuring pass and the pages            |
-| `apps/website/src/document-pages.tsx`               | The paginated, print-faithful document viewer                         |
-| `apps/website/src/document-layout.ts`               | Pure pagination over measured blocks                                  |
-| `apps/website/src/document-measure.ts`              | Reads block heights and break offsets from the offscreen copy         |
-| `apps/website/src/slide-deck.tsx`                   | Real-size 16:9 slides scaled to fit the screen                        |
-| `apps/website/src/math.ts`                          | LaTeX to KaTeX HTML                                                   |
-| `apps/website/src/examples.ts`                      | Example files that exercise every block kind and slide layout         |
-| `apps/website/src/routes/__root.tsx`                | TanStack Start document and the demo user picker                      |
-| `apps/website/src/routes/api.$.ts`                  | Same-origin API route forwarding through an Alchemy service binding   |
-| `test/api.test.ts`                                  | Integration tests against actual Workers, objects, and Postgres       |
-| `test/browser/files.pw.ts`                          | Playwright coverage of creating, editing, and paginating files        |
+| File                                                | Purpose                                                                     |
+| --------------------------------------------------- | --------------------------------------------------------------------------- |
+| `alchemy.run.ts`                                    | Deploy the API Worker and the TanStack Start website                        |
+| `stacks/database.ts`                                | The shared Postgres database, deployed by CI on every merge                 |
+| `stacks/github.ts`                                  | CI's scoped Cloudflare token, deployed once under the `admin` profile       |
+| `stacks/workos.ts`                                  | The WorkOS redirect URI each deployed stage registers for its callback      |
+| `workos-emulate.config.yaml`                        | The emulator's users for local runs and tests: Alice and Bob                |
+| `packages/contract/src/user.ts`                     | Users, sessions, the `Authentication` middleware, and the sign-in routes    |
+| `packages/contract/src/versioning.ts`               | Versioned files: items with versions, revisions, operations, results        |
+| `packages/contract/src/documents.ts`                | The document model: page settings, blocks, and its API group                |
+| `packages/contract/src/slides.ts`                   | The slide deck model on the same versioning core, and its group             |
+| `packages/contract/src/files.ts`                    | A user's file pointers and the group that creates and lists them            |
+| `packages/contract/src/api.ts`                      | The HttpApi that composes every feature group                               |
+| `apps/api/src/database.ts`                          | The typed handle other stacks use to read the shared database               |
+| `apps/api/src/auth.ts`                              | Sign-in through WorkOS: code exchange, sealed cookie, token checks, refresh |
+| `apps/api/src/postgres.ts`                          | The stage's PlanetScale branch, role, and Hyperdrive connection             |
+| `apps/api/migrations/`                              | Postgres migrations, applied to every branch at deploy time                 |
+| `apps/api/src/user-store.ts`                        | One Durable Object per user: the index of their files                       |
+| `apps/api/src/versioned.ts`                         | The pure versioning core: apply an operation to a file's state              |
+| `apps/api/src/document-object.ts`                   | One Durable Object per document                                             |
+| `apps/api/src/deck-object.ts`                       | One Durable Object per slide deck                                           |
+| `apps/api/src/object-database.ts`                   | Service for an object's own SQLite: migrations and decoded queries          |
+| `apps/api/src/worker.ts`                            | The Worker that serves the API from Postgres and the objects                |
+| `apps/website/src/atoms.ts`                         | The AtomHttpApi client and the signed-in user atom shared by every route    |
+| `apps/website/src/routes/index.tsx`                 | A user's files, the create form, and the example starters                   |
+| `apps/website/src/routes/documents.$documentId.tsx` | One document: pages, rename, edit and add paragraphs                        |
+| `apps/website/src/routes/decks.$deckId.tsx`         | One deck: rename, add and delete slides                                     |
+| `apps/website/src/blocks.tsx`                       | Block renderers shared by the measuring pass and the pages                  |
+| `apps/website/src/document-pages.tsx`               | The paginated, print-faithful document viewer                               |
+| `apps/website/src/document-layout.ts`               | Pure pagination over measured blocks                                        |
+| `apps/website/src/document-measure.ts`              | Reads block heights and break offsets from the offscreen copy               |
+| `apps/website/src/slide-deck.tsx`                   | Real-size 16:9 slides scaled to fit the screen                              |
+| `apps/website/src/math.ts`                          | LaTeX to KaTeX HTML                                                         |
+| `apps/website/src/examples.ts`                      | Example files that exercise every block kind and slide layout               |
+| `apps/website/src/routes/__root.tsx`                | TanStack Start document and the account bar: sign in with Google, sign out  |
+| `apps/website/src/routes/api.$.ts`                  | Same-origin API route forwarding through an Alchemy service binding         |
+| `test/api.test.ts`                                  | Integration tests against actual Workers, objects, and Postgres             |
+| `test/browser/files.pw.ts`                          | Playwright coverage of creating, editing, and paginating files              |
 
 The workspace is split by runtime. `packages/contract` runs everywhere and depends on Effect only. `apps/api` runs in workerd and depends on the contract and Alchemy. `apps/website` runs in the browser and SSR and depends on the contract and TanStack. The website never imports `@starter/api`; the Vite build fails if it does.
 
+## Sign-in
+
+People sign in with Google through [WorkOS AuthKit](https://workos.com/docs/authkit). AuthKit owns identities, the Google OAuth exchange, and sessions on its side; the API owns the session resource. `GET /api/auth/sign-in` sends the browser to AuthKit's page, which offers only Google and runs any step sign-in needs, such as verifying a new email; the callback exchanges the code, records the user, and sets a sealed, HttpOnly `session` cookie. Every endpoint behind `Authentication` verifies the access token inside it against WorkOS's signing keys and refreshes it when it expires. Signing out is deleting a session: `DELETE /api/sessions/current`, or another device's from `GET /api/sessions`. A revoked session's cookie keeps working until its short-lived access token expires, because tokens are checked without a call to WorkOS.
+
+Local runs and tests use WorkOS's own [emulator](https://github.com/workos/emulate), which `alchemy dev` starts, so they need no WorkOS account and leave nothing behind. Pull request previews use a WorkOS Staging environment, each registering its own callback URI, and production uses WorkOS Production.
+
 ## Postgres and preview deployments
 
-Postgres is the control plane: who exists and what they own, the data you query across users. Durable Objects are the data plane: hot state with one writer each. Users start in Postgres today; authentication and the records it needs belong there too.
+Postgres is the control plane: who exists and what they own, the data you query across users. Durable Objects are the data plane: hot state with one writer each. Each user's row is recorded the first time they sign in to a stage.
 
-Every stage gets its own [PlanetScale branch](https://planetscale.com/docs/postgres/branching). `prod` serves from the database's `main` branch, and every other stage — yours from `bun run dev`, each test run, and each pull request — gets an empty `PS-DEV` branch. Branches share no data, so Alchemy applies `apps/api/migrations` and `apps/api/seed.sql` to each one at deploy time. The database itself belongs to its own stack, `stacks/database.ts`, so it exists before any stage needs a branch; CI deploys it on every merge to `main` and plans it on every pull request.
+Every stage gets its own [PlanetScale branch](https://planetscale.com/docs/postgres/branching). `prod` serves from the database's `main` branch, and every other stage — yours from `bun run dev`, each test run, and each pull request — gets an empty `PS-DEV` branch. Branches share no data, so Alchemy applies `apps/api/migrations` to each one at deploy time. The database itself belongs to its own stack, `stacks/database.ts`, so it exists before any stage needs a branch; CI deploys it on every merge to `main` and plans it on every pull request.
 
 The Worker reaches its branch through [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) with query caching off, so a read never returns a row from before the latest write; Hyperdrive still pools connections near the database. Queries use `@effect/sql-pg` through Alchemy's `SQL.Postgres`, which opens a pool on a request's first query and closes it when the request ends.
 
@@ -75,6 +83,12 @@ Each pull request deploys to its own `pr-<number>` stage the moment it is pushed
 ## Observability
 
 Every request is one trace in [Workers Observability](https://developers.cloudflare.com/workers/observability/): the website Worker starts it, and Cloudflare carries it into the API Worker and each Durable Object call. `Cloudflare.Telemetry()` in `worker.ts` places the Effect spans from each `Effect.fn` inside it, including `@effect/sql`'s query spans, which matter because Cloudflare does not trace Hyperdrive. Workers Logs is on for both Workers. Traces are in beta, so span names may change.
+
+To find out why a request failed, query its events with Cloudflare's [`cf` CLI](https://developers.cloudflare.com/cf/): the trace shows each outbound call and its status, and the log lines carry the full error, which `alchemy logs` truncates to its first line. For example, every event from a preview's API Worker in a time window:
+
+```sh
+npx cf observability telemetry query --body '{"queryId":"debug","view":"events","dry":true,"timeframe":{"from":<ms>,"to":<ms>},"parameters":{"needle":{"value":"starter-api-pr-<n>"}}}'
+```
 
 To send traces and logs to Axiom, Honeycomb, or any OpenTelemetry backend, leave the code alone and export from Cloudflare: add a [`Cloudflare.Workers.ObservabilityDestination`](https://alchemy.run/cloudflare/observability/axiom-observability/) per signal and list it in each Worker's `observability.traces.destinations` or `logs.destinations`. Do not add a second tracer in the Worker; Effect has one, and `Cloudflare.Telemetry()` provides it.
 

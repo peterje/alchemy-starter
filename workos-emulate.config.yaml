@@ -1,0 +1,14 @@
+# Users of the local WorkOS emulator, which `bun run dev` and the tests start. Each signs in
+# "with Google" on the emulator's login page. Ids are pinned because a user's files live in a
+# Durable Object keyed by their id.
+users:
+  - id: user_alice
+    email: alice@example.com
+    first_name: Alice
+    email_verified: true
+    oauth_provider: GoogleOAuth
+  - id: user_bob
+    email: bob@example.com
+    first_name: Bob
+    email_verified: true
+    oauth_provider: GoogleOAuth

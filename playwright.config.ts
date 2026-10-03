@@ -13,7 +13,8 @@ export default defineConfig({
   // A stage and port of its own, so tests never touch a developer's demo data. Per user, like
   // Test.make's default, so CI runs for different pull requests never share a stage.
   webServer: {
-    command: "PORT=1341 API_PORT=1342 bun run dev --stage browser_${USER:-local}",
+    command:
+      "PORT=1341 API_PORT=1342 WORKOS_API_URL=http://localhost:4101 bun run dev --stage browser_${USER:-local}",
     url: "http://localhost:1341",
     reuseExistingServer: false,
     // The first run creates the stage's database branch, which takes a few minutes.
