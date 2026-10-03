@@ -33,11 +33,14 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     const postgres = yield* Cloudflare.Hyperdrive.Connect(Postgres);
     // Opens a pool on a request's first query and closes it when the request ends: Hyperdrive
     // already keeps the connections to the database warm.
-    // The first connection to a `PS_DEV` branch through `alchemy dev` can take longer than the
-    // driver's 5-second default; Hyperdrive keeps deployed connections warm.
     const sql = yield* SQL.Postgres({
       url: postgres.connectionString,
+      // The first connection to a `PS_DEV` branch through `alchemy dev` can take longer than the
+      // driver's 5-second default; Hyperdrive keeps deployed connections warm.
       connectTimeout: "15 seconds",
+      // Named statements die with the request's connection, and Hyperdrive replays them onto
+      // whichever pooled connection it assigns: ~40ms on each request's first query, measured.
+      prepare: false,
     });
     const userStores = yield* UserStore;
     const documents = yield* DocumentObject;
