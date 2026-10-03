@@ -1,5 +1,4 @@
 import { RegistryProvider, useAtom, useAtomSuspense } from "@effect/atom-react";
-import { UserId, UserName } from "@starter/contract/user";
 import {
   HeadContent,
   Link,
@@ -8,18 +7,16 @@ import {
   createRootRoute,
   useHydrated,
 } from "@tanstack/react-router";
-import { Exit, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { type ReactNode, Suspense } from "react";
 
-import { client, userAtom } from "../atoms.ts";
+import { client, meAtom } from "../atoms.ts";
 
 import "../styles.css";
 
-/** Root document route for the starter demo. */
-const usersAtom = client.query("users", "list", { reactivityKeys: ["users"] });
-const createUserAtom = client.mutation("users", "create");
+const signOutAtom = client.mutation("sessions", "deleteCurrent");
 
+/** Root document route for the starter demo. */
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -38,80 +35,40 @@ function RootComponent() {
   // The provider does not inherit the package default, which sweeps unused atoms after 400ms.
   return (
     <RegistryProvider defaultIdleTTL={400}>
-      <Suspense fallback={<p role="status">Loading users…</p>}>
-        <UserPicker />
+      <Suspense fallback={<p role="status">Loading your account…</p>}>
+        <Account />
       </Suspense>
       <Outlet />
     </RegistryProvider>
   );
 }
 
-function UserPicker() {
+function Account() {
   const hydrated = useHydrated();
-  const [userId, selectUser] = useAtom(userAtom);
-  const users = useAtomSuspense(usersAtom, { includeFailure: true });
-  const [created, createUser] = useAtom(createUserAtom, { mode: "promiseExit" });
-  const busy = !hydrated || AsyncResult.isWaiting(created);
-  if (AsyncResult.isFailure(users)) {
+  const me = useAtomSuspense(meAtom, { includeFailure: true });
+  const [signingOut, signOut] = useAtom(signOutAtom, { mode: "promiseExit" });
+  // Signing in is a full-page navigation: GitHub and WorkOS redirect back to the callback, which
+  // creates the session cookie.
+  if (AsyncResult.isFailure(me)) {
     return (
-      <p role="alert" className="error">
-        Could not load users. Reload to try again.
+      <p className="account">
+        <a className="button" href="/api/auth/github">
+          Sign in with GitHub
+        </a>
       </p>
     );
   }
   return (
-    <>
-      <label className="user-picker">
-        Demo user
-        <select
-          value={userId}
-          disabled={!hydrated}
-          onChange={(event) => selectUser(UserId.make(event.currentTarget.value))}
-        >
-          {users.value.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <form
-        className="user-picker"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          const form = event.currentTarget;
-          // The input's constraint attributes mirror UserName, so a decode failure is a bug, not user error.
-          const name = Schema.decodeUnknownSync(UserName)(new FormData(form).get("name"));
-          const result = await createUser({ payload: { name }, reactivityKeys: ["users"] });
-          if (Exit.isSuccess(result)) {
-            form.reset();
-            selectUser(result.value.id);
-          }
-        }}
+    <p className="account">
+      Signed in as <strong>{me.value.name}</strong>
+      <button
+        type="button"
+        disabled={!hydrated || AsyncResult.isWaiting(signingOut)}
+        onClick={() => signOut({ reactivityKeys: ["me", "files"] })}
       >
-        <label htmlFor="new-user">New user</label>
-        <input
-          id="new-user"
-          name="name"
-          disabled={busy}
-          required
-          pattern=".*\S.*"
-          maxLength={80}
-          placeholder="Carol"
-        />
-        <button type="submit" disabled={busy}>
-          Add user
-        </button>
-      </form>
-      {AsyncResult.isFailure(created) ? (
-        <p role="alert" className="error">
-          Could not add the user. Try again.
-        </p>
-      ) : null}
-      <p className="hint">
-        Public demo — switching users is not authentication. Don’t store private data.
-      </p>
-    </>
+        Sign out
+      </button>
+    </p>
   );
 }
 

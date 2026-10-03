@@ -7,9 +7,12 @@
     "./*": "./src/*.ts"
   },
   "dependencies": {
+    "@distilled.cloud/workos": "1.0.0-rc.13",
     "@effect/sql-pg": "4.0.0",
     "@starter/contract": "workspace:*",
     "alchemy": "2.0.0-beta.80",
-    "effect": "4.0.0"
+    "effect": "4.0.0",
+    "iron-webcrypto": "^2.0.0",
+    "jose": "^6.2.12"
   }
 }

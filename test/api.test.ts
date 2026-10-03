@@ -8,20 +8,35 @@ import {
   DocumentId,
 } from "@starter/contract/documents";
 import { type Deck, DeckId } from "@starter/contract/slides";
-import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
+import * as Command from "alchemy/Command";
+import * as GitHub from "alchemy/GitHub";
 import * as Planetscale from "alchemy/Planetscale";
 import * as Test from "alchemy/Test/Bun";
-import { Effect, Layer, Result } from "effect";
-import { HttpBody, HttpClient } from "effect/http";
+import { Config, Effect, Layer, Option, Result } from "effect";
+import {
+  Cookies,
+  FetchHttpClient,
+  HttpBody,
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
 import Stack from "../alchemy.run.ts";
+import * as WorkOS from "../stacks/workos.ts";
 
-// Deploy the real stack into local workerd: actual Durable Object SQLite databases and the
-// stage's own PlanetScale branch.
+// Deploy the real stack into local workerd: actual Durable Object SQLite databases, the stage's
+// own PlanetScale branch, and the WorkOS emulator that dev mode starts.
 const { test, beforeAll, deploy } = Test.make({
-  providers: Layer.mergeAll(Cloudflare.providers(), Planetscale.providers()),
+  providers: Layer.mergeAll(
+    Cloudflare.providers(),
+    Command.providers(),
+    GitHub.providers(),
+    Planetscale.providers(),
+    WorkOS.providers(),
+  ),
   // Shared state, so the next CI run, and the cleanup job, find the stage this run left.
   state: Cloudflare.state(),
   dev: true,
@@ -30,10 +45,70 @@ const { test, beforeAll, deploy } = Test.make({
 // reuse it, and closing a pull request destroys its CI stages.
 const stack = beforeAll(deploy(Stack), { timeout: 600_000 });
 
-const client = Effect.gen(function* () {
-  const { websiteUrl } = yield* stack;
-  return yield* HttpApiClient.make(Api, { baseUrl: websiteUrl });
+const emulator = Config.all({
+  url: Config.String("WORKOS_API_URL"),
+  apiKey: Config.String("WORKOS_API_KEY"),
 });
+
+// Sign-in is a chain of redirects whose cookies carry the state, so follow them by hand.
+const manualRedirects = Layer.mergeAll(
+  FetchHttpClient.layer,
+  Layer.succeed(FetchHttpClient.RequestInit, { redirect: "manual" }),
+);
+const cookie = (response: HttpClientResponse.HttpClientResponse, name: string) =>
+  Option.getOrThrow(Cookies.getValue(response.cookies, name));
+const location = (response: HttpClientResponse.HttpClientResponse) =>
+  new URL(Option.getOrThrow(Option.fromNullishOr(response.headers["location"])));
+
+/** A new emulator user, so tests sharing the persistent test stage never share files. */
+const newUser = (name: string) =>
+  Effect.gen(function* () {
+    const { url, apiKey } = yield* emulator;
+    const email = `${name.toLowerCase()}-${crypto.randomUUID()}@example.com`;
+    yield* HttpClientRequest.post(`${url}/user_management/users`).pipe(
+      HttpClientRequest.bearerToken(apiKey),
+      HttpClientRequest.bodyJsonUnsafe({ email, first_name: name, email_verified: true }),
+      HttpClient.execute,
+      Effect.flatMap(HttpClientResponse.filterStatusOk),
+    );
+    return email;
+  });
+
+/** Signs in "with GitHub" on the emulator's login page, as a browser would; returns the cookie. */
+const signIn = (email: string) =>
+  Effect.gen(function* () {
+    const { websiteUrl } = yield* stack;
+    const start = yield* HttpClient.get(`${websiteUrl}/api/auth/github`);
+    const authorize = location(start);
+    const chosen = yield* HttpClientRequest.post(
+      new URL("/user_management/authorize", authorize),
+    ).pipe(
+      HttpClientRequest.bodyUrlParams({
+        client_id: authorize.searchParams.get("client_id") ?? "",
+        redirect_uri: authorize.searchParams.get("redirect_uri") ?? "",
+        state: authorize.searchParams.get("state") ?? "",
+        email,
+      }),
+      HttpClient.execute,
+    );
+    const callback = yield* HttpClientRequest.get(location(chosen)).pipe(
+      HttpClientRequest.setHeader("cookie", `auth_state=${cookie(start, "auth_state")}`),
+      HttpClient.execute,
+    );
+    return `session=${cookie(callback, "session")}`;
+  }).pipe(Effect.provide(manualRedirects));
+
+/** The API as a signed-in user. */
+const clientFor = (name: string) =>
+  Effect.gen(function* () {
+    const { websiteUrl } = yield* stack;
+    const session = yield* signIn(yield* newUser(name));
+    const api = yield* HttpApiClient.make(Api, {
+      baseUrl: websiteUrl,
+      transformClient: HttpClient.mapRequest(HttpClientRequest.setHeader("cookie", session)),
+    });
+    return { api, session };
+  });
 
 const paragraph = (id: string, text: string): Block => ({
   id,
@@ -50,28 +125,33 @@ const lesson: Deck = {
 };
 
 test(
-  "users live in Postgres, starting with the seeded demo users",
+  "signing in with GitHub creates a session and records the user",
+  Effect.gen(function* () {
+    const { api } = yield* clientFor("Dana");
+
+    const me = yield* api.users.me();
+    expect(me.name).toBe("Dana");
+    const current = yield* api.sessions.current();
+    expect(current.current).toBe(true);
+    expect((yield* api.sessions.list()).map(({ id }) => id)).toContain(current.id);
+
+    yield* api.sessions.deleteCurrent();
+    expect((yield* api.sessions.list()).map(({ id }) => id)).not.toContain(current.id);
+  }),
+  { timeout: 120_000 },
+);
+
+test(
+  "the API refuses requests without a session, and callbacks without the browser's state",
   Effect.gen(function* () {
     const { websiteUrl } = yield* stack;
-    const api = yield* client;
-
-    const created = yield* api.users.create({ payload: { name: "Carol" } });
-    const users = yield* api.users.list();
-    expect(users.slice(0, 2).map((user) => user.id)).toEqual([
-      UserId.make("alice"),
-      UserId.make("bob"),
-    ]);
-    expect(users).toContainEqual(created);
-
-    // The server decodes names at its boundary, so raw requests are trimmed or rejected there.
-    const padded = yield* HttpClient.post(`${websiteUrl}/api/users`, {
-      body: HttpBody.jsonUnsafe({ name: "  Dana  " }),
-    });
-    expect(yield* padded.json).toMatchObject({ name: "Dana" });
-    const blank = yield* HttpClient.post(`${websiteUrl}/api/users`, {
-      body: HttpBody.jsonUnsafe({ name: "   " }),
-    });
-    expect(blank.status).toBe(400);
+    for (const route of ["/api/users/me", "/api/sessions", "/api/files"]) {
+      expect((yield* HttpClient.get(`${websiteUrl}${route}`)).status).toBe(401);
+    }
+    const forged = yield* HttpClient.get(
+      `${websiteUrl}/api/auth/github/callback?code=stolen&state=guessed`,
+    ).pipe(Effect.provide(manualRedirects));
+    expect(forged.status).toBe(401);
   }),
   { timeout: 120_000 },
 );
@@ -79,13 +159,12 @@ test(
 test(
   "a document object versions its blocks, replays operations, and reports conflicts",
   Effect.gen(function* () {
-    const api = yield* client;
-    const alice = UserId.make("files-test-alice");
+    const { api } = yield* clientFor("Alice");
 
-    const file = yield* api.files.createDocument({ params: { userId: alice }, payload: worksheet });
+    const file = yield* api.files.createDocument({ payload: worksheet });
     if (file.kind !== "document") throw new Error(`expected a document, got ${file.kind}`);
     expect(file.title).toBe("Worksheet");
-    expect(yield* api.files.list({ params: { userId: alice } })).toEqual([file]);
+    expect(yield* api.files.list()).toEqual([file]);
     const documentId = file.id;
     const apply = (payload: Parameters<typeof api.documents.apply>[0]["payload"]) =>
       api.documents.apply({ params: { documentId }, payload });
@@ -166,9 +245,8 @@ test(
 test(
   "a deck object versions its slides",
   Effect.gen(function* () {
-    const api = yield* client;
-    const bob = UserId.make("files-test-bob");
-    const file = yield* api.files.createDeck({ params: { userId: bob }, payload: lesson });
+    const { api } = yield* clientFor("Bob");
+    const file = yield* api.files.createDeck({ payload: lesson });
     if (file.kind !== "deck") throw new Error(`expected a deck, got ${file.kind}`);
     const deckId = file.id;
 
@@ -200,16 +278,15 @@ test(
   "the objects reject content that does not match the schema",
   Effect.gen(function* () {
     const { websiteUrl } = yield* stack;
-    const api = yield* client;
-    const carol = UserId.make("files-test-carol");
-    const file = yield* api.files.createDocument({ params: { userId: carol }, payload: worksheet });
+    const { api, session } = yield* clientFor("Carol");
+    const file = yield* api.files.createDocument({ payload: worksheet });
     for (const request of [
       {
-        url: `/users/${carol}/files/documents`,
+        url: "/files/documents",
         body: { meta: worksheet.meta, items: [{ id: "x", type: "sticker" }] },
       },
       {
-        url: `/users/${carol}/files/documents`,
+        url: "/files/documents",
         body: { meta: worksheet.meta, items: [paragraph("same", "a"), paragraph("same", "b")] },
       },
       {
@@ -225,6 +302,7 @@ test(
       },
     ]) {
       const response = yield* HttpClient.post(`${websiteUrl}/api${request.url}`, {
+        headers: { cookie: session },
         body: HttpBody.jsonUnsafe(request.body),
       });
       expect(response.status).toBe(400);

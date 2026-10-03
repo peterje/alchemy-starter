@@ -3,7 +3,7 @@ import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 
 import { Document, DocumentId, DocumentTitle } from "./documents.ts";
 import { Deck, DeckId } from "./slides.ts";
-import { UserId } from "./user.ts";
+import { Authentication } from "./user.ts";
 
 /**
  * A user's files: pointers to the document and deck objects they created.
@@ -26,22 +26,20 @@ export const FileRef = Schema.Union([
 ]);
 export type FileRef = typeof FileRef.Type;
 
-/** Backed by the user's object: the files a user created. */
+/** Backed by the signed-in user's object: the files they created. */
 export class FilesGroup extends HttpApiGroup.make("files")
   .add(
     HttpApiEndpoint.get("list", "/", {
-      params: { userId: UserId },
       success: Schema.Array(FileRef),
     }),
     HttpApiEndpoint.post("createDocument", "/documents", {
-      params: { userId: UserId },
       payload: Document,
       success: FileRef,
     }),
     HttpApiEndpoint.post("createDeck", "/decks", {
-      params: { userId: UserId },
       payload: Deck,
       success: FileRef,
     }),
   )
-  .prefix("/users/:userId/files") {}
+  .middleware(Authentication)
+  .prefix("/files") {}

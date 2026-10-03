@@ -1,15 +1,16 @@
 import { Api } from "@starter/contract/api";
 import { DocumentNotFound } from "@starter/contract/documents";
 import { DeckNotFound } from "@starter/contract/slides";
-import { User, UserId } from "@starter/contract/user";
+import { CurrentUser, User, UserId } from "@starter/contract/user";
 import { InvalidOperation } from "@starter/contract/versioning";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as SQL from "alchemy/SQL/Postgres";
-import { Config, Effect, Layer, Schema } from "effect";
-import { HttpRouter, HttpServer } from "effect/http";
-import { HttpApiBuilder } from "effect/http-api";
+import { Config, Effect, Layer, Option } from "effect";
+import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { HttpApiBuilder, HttpApiError } from "effect/http-api";
 import { SqlSchema } from "effect/sql";
 
+import { AuthenticationLive, type Device, sessionCookieOptions, WorkOSAuth } from "./auth.ts";
 import { region } from "./database.ts";
 import DeckObject from "./deck-object.ts";
 import DocumentObject from "./document-object.ts";
@@ -46,33 +47,136 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     const documents = yield* DocumentObject;
     const decks = yield* DeckObject;
 
+    const auth = yield* WorkOSAuth;
+
     // Storage failures are defects: the HTTP boundary logs them and answers 500.
-    const listUsers = SqlSchema.findAll({
-      Request: Schema.Void,
-      Result: User,
-      execute: () => sql`SELECT id, name FROM users ORDER BY created_at, id`,
-    });
-    const insertUser = SqlSchema.findOne({
+    const saveUser = SqlSchema.findOne({
       Request: User,
       Result: User,
-      execute: (user) => sql`INSERT INTO users ${sql.insert(user)} RETURNING id, name`,
+      execute: (user) => sql`INSERT INTO users ${sql.insert(user)}
+        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email
+        RETURNING id, name, email`,
     });
-    const usersGroup = HttpApiBuilder.group(Api, "users", (handlers) =>
+    const findUser = SqlSchema.findOneOption({
+      Request: UserId,
+      Result: User,
+      execute: (id) => sql`SELECT id, name, email FROM users WHERE id = ${id}`,
+    });
+
+    // The callback lives on whichever origin the request came through, so each stage's
+    // website receives its own sign-ins.
+    const callbackUrl = (request: HttpServerRequest.HttpServerRequest) =>
+      Option.match(HttpServerRequest.toURL(request), {
+        onNone: () => "/api/auth/github/callback",
+        onSome: (url) => new URL("/api/auth/github/callback", url.origin).toString(),
+      });
+    const stateCookie = "auth_state";
+    const stateCookieOptions = {
+      ...sessionCookieOptions,
+      path: "/api/auth",
+      maxAge: "10 minutes",
+    } as const;
+    // Ending this browser's session also clears its cookie, so it stops presenting it.
+    const signedOut = HttpServerResponse.empty({ status: 204 }).pipe(
+      HttpServerResponse.setCookieUnsafe("session", "", { ...sessionCookieOptions, maxAge: 0 }),
+    );
+
+    const authGroup = HttpApiBuilder.group(Api, "auth", (handlers) =>
       handlers.handleAll({
-        list: () => Effect.orDie(listUsers(undefined)),
-        create: ({ payload }) =>
-          Effect.orDie(insertUser({ id: UserId.make(crypto.randomUUID()), name: payload.name })),
+        github: ({ request }) => {
+          // The callback compares this with the state WorkOS returns, so another site cannot
+          // complete a sign-in in this browser.
+          const state = crypto.randomUUID();
+          const location = auth.authorizeUrl({ redirectUri: callbackUrl(request), state });
+          return Effect.succeed(
+            HttpServerResponse.redirect(location, { status: 302 }).pipe(
+              HttpServerResponse.setCookieUnsafe(stateCookie, state, stateCookieOptions),
+            ),
+          );
+        },
+        githubCallback: ({ query, request }) =>
+          Effect.gen(function* () {
+            if (request.cookies[stateCookie] !== query.state) {
+              return yield* Effect.fail(new HttpApiError.Unauthorized());
+            }
+            // The browser's address and user agent label the session in its user's device list.
+            const device: Device = {};
+            const ipAddress = request.headers["cf-connecting-ip"];
+            const userAgent = request.headers["user-agent"];
+            if (ipAddress !== undefined) device.ip_address = ipAddress;
+            if (userAgent !== undefined) device.user_agent = userAgent;
+            const { user, sealed } = yield* auth.signIn({ code: query.code, device });
+            // Each stage's database records a user the first time they sign in to it.
+            yield* Effect.orDie(saveUser(user));
+            return HttpServerResponse.redirect("/", { status: 302 }).pipe(
+              HttpServerResponse.setCookieUnsafe("session", sealed, sessionCookieOptions),
+              HttpServerResponse.setCookieUnsafe(stateCookie, "", {
+                ...stateCookieOptions,
+                maxAge: 0,
+              }),
+            );
+          }),
       }),
     );
 
-    // Demo routing only. Select the user's object from a verified session before storing private data.
+    const usersGroup = HttpApiBuilder.group(Api, "users", (handlers) =>
+      handlers.handleAll({
+        me: () =>
+          Effect.gen(function* () {
+            const { id } = yield* CurrentUser;
+            const user = yield* Effect.orDie(findUser(id));
+            if (Option.isNone(user)) return yield* Effect.fail(new HttpApiError.Unauthorized());
+            return user.value;
+          }),
+      }),
+    );
+
+    // WorkOS failures here are defects: the session was just verified, so WorkOS is reachable.
+    const mySessions = Effect.flatMap(CurrentUser, ({ id, sessionId }) =>
+      Effect.orDie(auth.sessions({ userId: id, currentSessionId: sessionId })),
+    );
+    const sessionsGroup = HttpApiBuilder.group(Api, "sessions", (handlers) =>
+      handlers.handleAll({
+        list: () => mySessions,
+        current: () =>
+          Effect.flatMap(mySessions, (sessions) => {
+            const current = sessions.find((session) => session.current);
+            return current === undefined
+              ? Effect.die("the verified session is not active")
+              : Effect.succeed(current);
+          }),
+        deleteCurrent: () =>
+          Effect.gen(function* () {
+            const { sessionId } = yield* CurrentUser;
+            yield* Effect.orDie(auth.revoke(sessionId));
+            return signedOut;
+          }),
+        delete: ({ params }) =>
+          Effect.gen(function* () {
+            // Only the signed-in user's own sessions can be ended.
+            const session = (yield* mySessions).find(({ id }) => id === params.id);
+            if (session === undefined) return yield* Effect.fail(new HttpApiError.NotFound());
+            yield* Effect.orDie(auth.revoke(session.id));
+            return session.current ? signedOut : HttpServerResponse.empty({ status: 204 });
+          }),
+        deleteAll: () =>
+          Effect.gen(function* () {
+            const sessions = yield* mySessions;
+            yield* Effect.forEach(sessions, ({ id }) => Effect.orDie(auth.revoke(id)), {
+              concurrency: "unbounded",
+            });
+            return signedOut;
+          }),
+      }),
+    );
+
     const files = HttpApiBuilder.group(Api, "files", (handlers) =>
       handlers.handleAll({
-        list: ({ params }) => userStores.getByName(params.userId).list(),
-        createDocument: ({ params, payload }) =>
-          userStores.getByName(params.userId).createDocument(payload),
-        createDeck: ({ params, payload }) =>
-          userStores.getByName(params.userId).createDeck(payload),
+        list: () => Effect.flatMap(CurrentUser, ({ id }) => userStores.getByName(id).list()),
+        createDocument: ({ payload }) =>
+          Effect.flatMap(CurrentUser, ({ id }) => userStores.getByName(id).createDocument(payload)),
+        createDeck: ({ payload }) =>
+          Effect.flatMap(CurrentUser, ({ id }) => userStores.getByName(id).createDeck(payload)),
       }),
     );
     const documentsGroup = HttpApiBuilder.group(Api, "documents", (handlers) =>
@@ -133,7 +237,8 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     );
     return {
       fetch: HttpApiBuilder.layer(Api).pipe(
-        Layer.provide([usersGroup, files, documentsGroup, decksGroup]),
+        Layer.provide([authGroup, usersGroup, sessionsGroup, files, documentsGroup, decksGroup]),
+        Layer.provide(AuthenticationLive.pipe(Layer.provide(Layer.succeed(WorkOSAuth, auth)))),
         Layer.provide(HttpServer.layerServices),
         HttpRouter.toHttpEffect,
       ),
@@ -145,6 +250,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
         // Effect spans join Cloudflare's trace, which already follows the website Worker into
         // this one and on into each Durable Object call. Cloudflare samples and exports it.
         Cloudflare.Telemetry(),
+        WorkOSAuth.layer,
       ),
     ),
   ),

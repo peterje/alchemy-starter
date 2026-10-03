@@ -6,19 +6,17 @@ import {
   type Inline,
 } from "@starter/contract/documents";
 import type { Deck } from "@starter/contract/slides";
-import type { UserId } from "@starter/contract/user";
 import { createFileRoute, Link, useHydrated, useNavigate } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { Suspense } from "react";
 
-import { client, userAtom } from "../atoms.ts";
+import { client, meAtom } from "../atoms.ts";
 import { algebraWorksheet, geometryQuiz, linearEquationsLesson } from "../examples.ts";
 
 export const Route = createFileRoute("/")({ component: FilesPage });
 
-const filesAtom = (userId: UserId) =>
-  client.query("files", "list", { params: { userId }, reactivityKeys: { files: [userId] } });
+const filesAtom = client.query("files", "list", { reactivityKeys: ["files"] });
 const createDocumentAtom = client.mutation("files", "createDocument");
 const createDeckAtom = client.mutation("files", "createDeck");
 
@@ -42,26 +40,35 @@ const newDeck = (title: string): Deck => ({
 function FilesPage() {
   return (
     <Suspense fallback={<p role="status">Loading files…</p>}>
-      <Files />
+      <SignedIn>
+        <Files />
+      </SignedIn>
     </Suspense>
   );
+}
+
+/** Files belong to a signed-in user, so signed-out visitors see an invitation instead. */
+function SignedIn({ children }: Readonly<{ children: React.ReactNode }>) {
+  const me = useAtomSuspense(meAtom, { includeFailure: true });
+  if (AsyncResult.isFailure(me)) {
+    return <p className="empty">Sign in with GitHub to create documents and decks.</p>;
+  }
+  return children;
 }
 
 function Files() {
   const hydrated = useHydrated();
   const navigate = useNavigate();
-  const userId = useAtomValue(userAtom);
-  const files = useAtomSuspense(filesAtom(userId), { includeFailure: true });
+  const files = useAtomSuspense(filesAtom, { includeFailure: true });
   const [createdDocument, createDocument] = useAtom(createDocumentAtom, { mode: "promiseExit" });
   const [createdDeck, createDeck] = useAtom(createDeckAtom, { mode: "promiseExit" });
   const creating = AsyncResult.isWaiting(createdDocument) || AsyncResult.isWaiting(createdDeck);
   const failed = AsyncResult.isFailure(createdDocument) || AsyncResult.isFailure(createdDeck);
   const busy = !hydrated || creating;
 
-  const keys = { files: [userId] };
+  const keys = ["files"];
   const openDocument = async (document: Document) => {
     const result = await createDocument({
-      params: { userId },
       payload: document,
       reactivityKeys: keys,
     });
@@ -70,14 +77,14 @@ function Files() {
     }
   };
   const openDeck = async (deck: Deck) => {
-    const result = await createDeck({ params: { userId }, payload: deck, reactivityKeys: keys });
+    const result = await createDeck({ payload: deck, reactivityKeys: keys });
     if (Exit.isSuccess(result) && result.value.kind === "deck") {
       await navigate({ to: "/decks/$deckId", params: { deckId: result.value.id } });
     }
   };
 
   return (
-    <section key={userId} aria-label={`${userId}'s files`}>
+    <section aria-label="Your files">
       <form
         onSubmit={async (event) => {
           event.preventDefault();

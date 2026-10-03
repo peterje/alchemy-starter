@@ -16,7 +16,7 @@ export const Postgres = Effect.gen(function* () {
   // SAFETY: `stage` is a Proxy that returns a reference for every key; only its index-signature
   // type, under noUncheckedIndexedAccess, admits undefined.
   const { name: database } = yield* Database.stage.shared!;
-  const schema = { migrations: "apps/api/migrations", importFiles: ["apps/api/seed.sql"] };
+  const schema = { migrations: "apps/api/migrations" };
   // PlanetScale creates `main` with the database, so prod adopts it instead of creating it.
   const branch = yield* stage === "prod"
     ? Planetscale.PostgresBranch("Branch", { database, name: "main", ...schema }).pipe(
