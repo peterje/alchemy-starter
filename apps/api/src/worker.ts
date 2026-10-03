@@ -10,6 +10,7 @@ import { HttpRouter, HttpServer } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { SqlSchema } from "effect/sql";
 
+import { region } from "./database.ts";
 import DeckObject from "./deck-object.ts";
 import DocumentObject from "./document-object.ts";
 import { Postgres } from "./postgres.ts";
@@ -24,6 +25,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     main: import.meta.url,
     // Cloudflare.Telemetry needs tracing.startActiveSpan, which this date enables.
     compatibility: { date: "2026-08-25" },
+    placement: { region: region.workers },
     workersDev: false,
     dev: { port: Config.Number("API_PORT").pipe(Config.withDefault(1338)) },
   },
