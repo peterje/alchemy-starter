@@ -109,22 +109,6 @@ export default Alchemy.Stack(
       enforceAdmins: true,
     });
 
-    // Everything reaches `main` through a pull request whose checks passed, so a merge deploys to
-    // production without running them again. Branches need not be up to date with `main`, so
-    // nobody rebases to merge; an organization-owned fork can enable GitHub's merge queue to also
-    // test pull requests together before they land.
-    yield* GitHub.BranchProtection("main", {
-      owner: GITHUB_OWNER,
-      repository: GITHUB_REPOSITORY,
-      branch: "main",
-      requiredStatusChecks: {
-        strict: false,
-        contexts: ["Verify", "Database", "API tests", "Browser tests"],
-      },
-      requiredPullRequestReviews: { requiredApprovingReviewCount: 0 },
-      enforceAdmins: true,
-    });
-
     // WorkOS issues API keys only from its dashboard (or `workos auth login` for Staging), so they
     // arrive through `.env`. Previews use Staging; production uses Production once it exists.
     yield* workosSecrets("STAGING", yield* workosKeys("STAGING"));

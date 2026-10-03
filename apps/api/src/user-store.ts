@@ -27,8 +27,8 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
         (yield* Cloudflare.DurableObjectState).id.name,
       );
 
-      // Creating a file writes to two objects. The file's object is authoritative and this row is
-      // the user's pointer to it, so a retry after a partial failure converges instead of diverging.
+      // Creating a file writes to two objects. The file's object is written first, so a failure
+      // between the writes leaves an object nobody can reach, never a pointer to a missing file.
       const remember = (file: {
         readonly kind: string;
         readonly id: string;

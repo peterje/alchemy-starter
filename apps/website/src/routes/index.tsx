@@ -1,4 +1,4 @@
-import { useAtom, useAtomSuspense, useAtomValue } from "@effect/atom-react";
+import { useAtom, useAtomSuspense } from "@effect/atom-react";
 import {
   type Document,
   defaultPageSettings,
