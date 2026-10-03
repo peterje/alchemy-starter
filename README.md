@@ -70,7 +70,7 @@ Every stage gets its own [PlanetScale branch](https://planetscale.com/docs/postg
 
 The Worker reaches its branch through [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) with query caching off, so a read never returns a row from before the latest write; Hyperdrive still pools connections near the database. Queries use `@effect/sql-pg` through Alchemy's `SQL.Postgres`, which opens a pool on a request's first query and closes it when the request ends.
 
-Each pull request deploys to its own `pr-<number>` stage the moment it is pushed, without waiting for checks, and the stack comments the preview URL on the pull request. Verification runs beside it, each suite on a stage and branch of its own that later pushes reuse. Closing the pull request destroys all three. Production deploys only after the checks pass on `main`.
+Each pull request deploys to its own `pr-<number>` stage the moment it is pushed, without waiting for checks, and the stack comments the preview URL on the pull request. Verification runs beside it, each suite on a stage and branch of its own that later pushes reuse. Closing the pull request destroys all three. Branch protection, declared in `stacks/github.ts`, only lets a pull request merge once its checks pass against the latest `main`, so a merge deploys to production without running them again.
 
 ## Versioned files
 
@@ -98,4 +98,4 @@ See [Alchemy's integration testing tutorial](https://alchemy.run/cloudflare/tuto
 
 The template keeps TypeScript strictness, Effect/React architecture lint rules in `packages/oxlint-plugins`, oxfmt, commit hooks, Playwright, and GitHub Actions. The browser build rejects server-only imports. No React `useState`/`useEffect` or additional client state library is needed.
 
-Every push to `main` that passes CI deploys to production, and every pull request gets a preview. `bun run provision` creates the shared database and CI's scoped Cloudflare token; the bootstrap guide in `AGENTS.md` walks through it.
+Changes reach `main` only through pull requests whose checks pass, each merge deploys to production, and every pull request gets a preview. `bun run provision` creates the shared database and CI's scoped Cloudflare token; the bootstrap guide in `AGENTS.md` walks through it.
