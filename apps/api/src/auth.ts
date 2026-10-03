@@ -110,6 +110,7 @@ export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
           client_id: clientId,
           redirect_uri: redirectUri,
           response_type: "code",
+          provider: "authkit",
           state,
         }).toString();
         return url.toString();
