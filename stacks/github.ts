@@ -14,10 +14,13 @@ const workosKeys = (environment: "STAGING" | "PRODUCTION") =>
   });
 
 /** One WorkOS environment's secrets. The cookie secret that seals sessions is minted here. */
-const workosSecrets = Effect.fn("workosSecrets")(function* (
-  environment: "STAGING" | "PRODUCTION",
-  keys: { readonly apiKey: Redacted.Redacted; readonly clientId: string },
-) {
+const workosSecrets = Effect.fn("WorkOS.secrets")(function* ({
+  environment,
+  keys,
+}: {
+  environment: "STAGING" | "PRODUCTION";
+  keys: { readonly apiKey: Redacted.Redacted; readonly clientId: string };
+}) {
   const cookiePassword = yield* Alchemy.Random(`WorkOSCookiePassword${environment}`);
   yield* GitHub.Secret(`workos-api-key-${environment.toLowerCase()}`, {
     owner: GITHUB_OWNER,
@@ -111,8 +114,10 @@ export default Alchemy.Stack(
 
     // WorkOS issues API keys only from its dashboard (or `workos auth login` for Staging), so they
     // arrive through `.env`. Previews use Staging; production uses Production once it exists.
-    yield* workosSecrets("STAGING", yield* workosKeys("STAGING"));
+    yield* workosSecrets({ environment: "STAGING", keys: yield* workosKeys("STAGING") });
     const production = yield* Config.option(workosKeys("PRODUCTION"));
-    if (Option.isSome(production)) yield* workosSecrets("PRODUCTION", production.value);
+    if (Option.isSome(production)) {
+      yield* workosSecrets({ environment: "PRODUCTION", keys: production.value });
+    }
   }),
 );

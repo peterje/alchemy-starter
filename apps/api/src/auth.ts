@@ -1,10 +1,13 @@
 import { Credentials, Services } from "@distilled.cloud/workos";
+import { Api } from "@starter/contract/api";
 import { Authentication, CurrentUser, Session, UserId } from "@starter/contract/user";
 import { Config, Context, Effect, Layer, Option, Redacted, Schema } from "effect";
-import { FetchHttpClient } from "effect/http";
+import { FetchHttpClient, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder, HttpApiError } from "effect/http-api";
 import * as Iron from "iron-webcrypto";
 import { createRemoteJWKSet, errors, jwtVerify } from "jose";
+
+import { Users } from "./users.ts";
 
 const sessionCookie = Authentication.security.session;
 
@@ -197,17 +200,18 @@ export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
       }),
 
       /** Ends a WorkOS session, so its refresh token stops working. */
-      revoke: (sessionId: string) =>
-        Services.workos
+      revoke: Effect.fn("WorkOSAuth.revoke")(function* (sessionId: string) {
+        yield* Services.workos
           .RevokeUserlandSessionsControllerSession({ session_id: sessionId })
-          .pipe(Effect.asVoid, Effect.provide(workos)),
+          .pipe(Effect.provide(workos));
+      }),
     };
   }),
 }) {
   static readonly layer = Layer.effect(this)(this.make);
 }
 
-export const sessionCookieOptions = {
+const sessionCookieOptions = {
   httpOnly: true,
   secure: true,
   sameSite: "lax",
@@ -216,12 +220,118 @@ export const sessionCookieOptions = {
 } as const;
 
 /** Resolves the signed-in user for every endpoint behind `Authentication`. */
-export const AuthenticationLive = Layer.effect(Authentication)(
+export const AuthenticationMiddleware = Layer.effect(Authentication)(
   Effect.gen(function* () {
     const auth = yield* WorkOSAuth;
     return Authentication.of({
       session: (effect, { credential }) =>
         Effect.provideServiceEffect(effect, CurrentUser, auth.fromSession(credential)),
+    });
+  }),
+);
+
+// The callback lives on whichever origin the request came through, so each stage's website
+// receives its own sign-ins.
+const callbackUrl = (request: HttpServerRequest.HttpServerRequest) =>
+  Option.match(HttpServerRequest.toURL(request), {
+    onNone: () => "/api/auth/callback",
+    onSome: (url) => new URL("/api/auth/callback", url.origin).toString(),
+  });
+const stateCookie = "auth_state";
+const stateCookieOptions = {
+  ...sessionCookieOptions,
+  path: "/api/auth",
+  maxAge: "10 minutes",
+} as const;
+
+export const AuthHandlers = HttpApiBuilder.group(Api, "auth", (handlers) =>
+  Effect.gen(function* () {
+    const auth = yield* WorkOSAuth;
+    const users = yield* Users;
+    return handlers.handleAll({
+      signIn: ({ request }) => {
+        // The callback compares this with the state WorkOS returns, so another site cannot
+        // complete a sign-in in this browser.
+        const state = crypto.randomUUID();
+        const location = auth.authorizeUrl({ redirectUri: callbackUrl(request), state });
+        return Effect.succeed(
+          HttpServerResponse.redirect(location, { status: 302 }).pipe(
+            HttpServerResponse.setCookieUnsafe(stateCookie, state, stateCookieOptions),
+          ),
+        );
+      },
+      callback: ({ query, request }) =>
+        Effect.gen(function* () {
+          const expected = request.cookies[stateCookie];
+          if (expected !== query.state) {
+            yield* Effect.logWarning("Sign-in callback state does not match", {
+              stateCookie: expected === undefined ? "missing" : "different",
+            });
+            return yield* Effect.fail(new HttpApiError.Unauthorized());
+          }
+          // The browser's address and user agent label the session in its user's device list.
+          const device: Device = {};
+          const ipAddress = request.headers["cf-connecting-ip"];
+          const userAgent = request.headers["user-agent"];
+          if (ipAddress !== undefined) device.ip_address = ipAddress;
+          if (userAgent !== undefined) device.user_agent = userAgent;
+          const { user, sealed } = yield* auth.signIn({ code: query.code, device });
+          // Each stage's database records a user the first time they sign in to it.
+          yield* users.save(user);
+          return HttpServerResponse.redirect("/", { status: 302 }).pipe(
+            HttpServerResponse.setCookieUnsafe(sessionCookie.key, sealed, sessionCookieOptions),
+            HttpServerResponse.setCookieUnsafe(stateCookie, "", {
+              ...stateCookieOptions,
+              maxAge: 0,
+            }),
+          );
+        }),
+    });
+  }),
+);
+
+// Ending this browser's session also clears its cookie, so it stops presenting it.
+const signedOut = HttpServerResponse.empty({ status: 204 }).pipe(
+  HttpServerResponse.setCookieUnsafe(sessionCookie.key, "", { ...sessionCookieOptions, maxAge: 0 }),
+);
+
+export const SessionsHandlers = HttpApiBuilder.group(Api, "sessions", (handlers) =>
+  Effect.gen(function* () {
+    const auth = yield* WorkOSAuth;
+    // WorkOS failures here are defects: the session was just verified, so WorkOS is reachable.
+    const mySessions = Effect.flatMap(CurrentUser, ({ id, sessionId }) =>
+      Effect.orDie(auth.sessions({ userId: id, currentSessionId: sessionId })),
+    );
+    const revoke = (sessionId: string) => Effect.orDie(auth.revoke(sessionId));
+    return handlers.handleAll({
+      list: () => mySessions,
+      current: () =>
+        Effect.flatMap(mySessions, (sessions) => {
+          const current = sessions.find((session) => session.current);
+          return current === undefined
+            ? Effect.die("the verified session is not active")
+            : Effect.succeed(current);
+        }),
+      deleteCurrent: () =>
+        Effect.gen(function* () {
+          const { sessionId } = yield* CurrentUser;
+          yield* revoke(sessionId);
+          return signedOut;
+        }),
+      delete: ({ params }) =>
+        Effect.gen(function* () {
+          // Only the signed-in user's own sessions can be ended.
+          const session = (yield* mySessions).find(({ id }) => id === params.id);
+          if (session === undefined) return yield* Effect.fail(new HttpApiError.NotFound());
+          yield* revoke(session.id);
+          return session.current ? signedOut : HttpServerResponse.empty({ status: 204 });
+        }),
+      deleteAll: () =>
+        Effect.gen(function* () {
+          const sessions = yield* mySessions;
+          yield* Effect.forEach(sessions, ({ id }) => revoke(id), { concurrency: "unbounded" });
+          return signedOut;
+        }),
     });
   }),
 );

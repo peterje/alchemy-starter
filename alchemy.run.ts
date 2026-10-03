@@ -28,16 +28,19 @@ export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
   },
 }) {}
 
+/** Every provider the stack's resources need; the integration tests deploy it with the same set. */
+export const providers = Layer.mergeAll(
+  Cloudflare.providers(),
+  Command.providers(),
+  GitHub.providers(),
+  Planetscale.providers(),
+  WorkOS.providers(),
+);
+
 export default Alchemy.Stack(
   "Starter",
   {
-    providers: Layer.mergeAll(
-      Cloudflare.providers(),
-      Command.providers(),
-      GitHub.providers(),
-      Planetscale.providers(),
-      WorkOS.providers(),
-    ),
+    providers,
     state: Cloudflare.state(),
   },
   Effect.gen(function* () {
