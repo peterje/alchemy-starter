@@ -66,7 +66,7 @@ The workspace is split by runtime. `packages/contract` runs everywhere and depen
 
 ## Sign-in
 
-People sign in with GitHub through [WorkOS AuthKit](https://workos.com/docs/authkit). AuthKit owns identities, the GitHub OAuth exchange, and sessions on its side; the API owns the session resource. `GET /api/auth/github` sends the browser to GitHub, and the callback exchanges the code, records the user, and sets a sealed, HttpOnly `session` cookie. Every endpoint behind `Authentication` verifies the access token inside it against WorkOS's signing keys and refreshes it when it expires. Signing out is deleting a session: `DELETE /api/sessions/current`, or another device's from `GET /api/sessions`. A revoked session's cookie keeps working until its short-lived access token expires, because tokens are checked without a call to WorkOS.
+People sign in with GitHub through [WorkOS AuthKit](https://workos.com/docs/authkit). AuthKit owns identities, the GitHub OAuth exchange, and sessions on its side; the API owns the session resource. `GET /api/auth/github` sends the browser to AuthKit's page, which offers only GitHub and runs any step sign-in needs, such as verifying a new email; the callback exchanges the code, records the user, and sets a sealed, HttpOnly `session` cookie. Every endpoint behind `Authentication` verifies the access token inside it against WorkOS's signing keys and refreshes it when it expires. Signing out is deleting a session: `DELETE /api/sessions/current`, or another device's from `GET /api/sessions`. A revoked session's cookie keeps working until its short-lived access token expires, because tokens are checked without a call to WorkOS.
 
 Local runs and tests use WorkOS's own [emulator](https://github.com/workos/emulate), which `alchemy dev` starts, so they need no WorkOS account and leave nothing behind. Pull request previews use a WorkOS Staging environment, each registering its own callback URI, and production uses WorkOS Production.
 
@@ -83,6 +83,12 @@ Each pull request deploys to its own `pr-<number>` stage the moment it is pushed
 ## Observability
 
 Every request is one trace in [Workers Observability](https://developers.cloudflare.com/workers/observability/): the website Worker starts it, and Cloudflare carries it into the API Worker and each Durable Object call. `Cloudflare.Telemetry()` in `worker.ts` places the Effect spans from each `Effect.fn` inside it, including `@effect/sql`'s query spans, which matter because Cloudflare does not trace Hyperdrive. Workers Logs is on for both Workers. Traces are in beta, so span names may change.
+
+To find out why a request failed, query its events with Cloudflare's [`cf` CLI](https://developers.cloudflare.com/cf/): the trace shows each outbound call and its status, and the log lines carry the full error, which `alchemy logs` truncates to its first line. For example, every event from a preview's API Worker in a time window:
+
+```sh
+npx cf observability telemetry query --body '{"queryId":"debug","view":"events","dry":true,"timeframe":{"from":<ms>,"to":<ms>},"parameters":{"needle":{"value":"starter-api-pr-<n>"}}}'
+```
 
 To send traces and logs to Axiom, Honeycomb, or any OpenTelemetry backend, leave the code alone and export from Cloudflare: add a [`Cloudflare.Workers.ObservabilityDestination`](https://alchemy.run/cloudflare/observability/axiom-observability/) per signal and list it in each Worker's `observability.traces.destinations` or `logs.destinations`. Do not add a second tracer in the Worker; Effect has one, and `Cloudflare.Telemetry()` provides it.
 

@@ -100,14 +100,16 @@ export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
       );
 
     return {
-      /** Sends the browser straight to GitHub through AuthKit, skipping its sign-in page. */
+      /**
+       * Sends the browser to AuthKit's sign-in page, configured to offer only GitHub. The page stays
+       * in the flow because AuthKit runs the steps around sign-in, such as verifying an email.
+       */
       authorizeUrl: ({ redirectUri, state }: { redirectUri: string; state: string }) => {
         const url = new URL("/user_management/authorize", apiUrl);
         url.search = new URLSearchParams({
           client_id: clientId,
           redirect_uri: redirectUri,
           response_type: "code",
-          provider: "GitHubOAuth",
           state,
         }).toString();
         return url.toString();
