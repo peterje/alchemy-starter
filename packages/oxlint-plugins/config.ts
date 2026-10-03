@@ -9,6 +9,18 @@ export default {
       specifier: "./packages/oxlint-plugins/index.ts",
     },
   ],
+  // shadcn generates components/ui and hooks; `shadcn add` overwrites them, so they keep its idiom.
+  overrides: [
+    {
+      files: ["apps/website/src/components/ui/**", "apps/website/src/hooks/**"],
+      rules: {
+        "workspace/no-use-state": "off",
+        "workspace/no-use-effect": "off",
+        "workspace/no-runtime-typeof": "off",
+        "workspace/require-safety-comment-for-type-assertion": "off",
+      },
+    },
+  ],
   rules: {
     "import/first": "error",
     "workspace/no-chained-type-assertions": "error",

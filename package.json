@@ -19,7 +19,7 @@
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "bun --bun oxlint --deny-warnings . && knip",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.bun.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/website && tsc --noEmit -p tsconfig.bun.json",
     "test:plugins": "node --experimental-strip-types --test packages/oxlint-plugins/*.rule.ts",
     "test:unit": "bun test ./apps ./packages/contract",
     "test:integration": "WORKOS_API_URL=http://localhost:4102 bun test --timeout 120000 ./test",

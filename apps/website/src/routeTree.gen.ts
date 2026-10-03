@@ -9,24 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LibraryRouteImport } from './routes/_library'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
-import { Route as DecksDeckIdRouteImport } from './routes/decks.$deckId'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
+import { Route as LibraryFilesRouteImport } from './routes/_library/files'
+import { Route as LibraryDocumentsDocumentIdRouteImport } from './routes/_library/documents.$documentId'
+import { Route as LibraryDecksDeckIdRouteImport } from './routes/_library/decks.$deckId'
 
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/_library',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
-  id: '/documents/$documentId',
-  path: '/documents/$documentId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DecksDeckIdRoute = DecksDeckIdRouteImport.update({
-  id: '/decks/$deckId',
-  path: '/decks/$deckId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
@@ -34,62 +30,82 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LibraryFilesRoute = LibraryFilesRouteImport.update({
+  id: '/files',
+  path: '/files',
+  getParentRoute: () => LibraryRoute,
+} as any)
+const LibraryDocumentsDocumentIdRoute =
+  LibraryDocumentsDocumentIdRouteImport.update({
+    id: '/documents/$documentId',
+    path: '/documents/$documentId',
+    getParentRoute: () => LibraryRoute,
+  } as any)
+const LibraryDecksDeckIdRoute = LibraryDecksDeckIdRouteImport.update({
+  id: '/decks/$deckId',
+  path: '/decks/$deckId',
+  getParentRoute: () => LibraryRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/files': typeof LibraryFilesRoute
   '/api/$': typeof ApiSplatRoute
-  '/decks/$deckId': typeof DecksDeckIdRoute
-  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/decks/$deckId': typeof LibraryDecksDeckIdRoute
+  '/documents/$documentId': typeof LibraryDocumentsDocumentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/files': typeof LibraryFilesRoute
   '/api/$': typeof ApiSplatRoute
-  '/decks/$deckId': typeof DecksDeckIdRoute
-  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/decks/$deckId': typeof LibraryDecksDeckIdRoute
+  '/documents/$documentId': typeof LibraryDocumentsDocumentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_library': typeof LibraryRouteWithChildren
+  '/_library/files': typeof LibraryFilesRoute
   '/api/$': typeof ApiSplatRoute
-  '/decks/$deckId': typeof DecksDeckIdRoute
-  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/_library/decks/$deckId': typeof LibraryDecksDeckIdRoute
+  '/_library/documents/$documentId': typeof LibraryDocumentsDocumentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/$' | '/decks/$deckId' | '/documents/$documentId'
+  fullPaths:
+    '/' | '/files' | '/api/$' | '/decks/$deckId' | '/documents/$documentId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/$' | '/decks/$deckId' | '/documents/$documentId'
-  id: '__root__' | '/' | '/api/$' | '/decks/$deckId' | '/documents/$documentId'
+  to: '/' | '/files' | '/api/$' | '/decks/$deckId' | '/documents/$documentId'
+  id:
+    | '__root__'
+    | '/'
+    | '/_library'
+    | '/_library/files'
+    | '/api/$'
+    | '/_library/decks/$deckId'
+    | '/_library/documents/$documentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LibraryRoute: typeof LibraryRouteWithChildren
   ApiSplatRoute: typeof ApiSplatRoute
-  DecksDeckIdRoute: typeof DecksDeckIdRoute
-  DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_library': {
+      id: '/_library'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents/$documentId': {
-      id: '/documents/$documentId'
-      path: '/documents/$documentId'
-      fullPath: '/documents/$documentId'
-      preLoaderRoute: typeof DocumentsDocumentIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/decks/$deckId': {
-      id: '/decks/$deckId'
-      path: '/decks/$deckId'
-      fullPath: '/decks/$deckId'
-      preLoaderRoute: typeof DecksDeckIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/$': {
@@ -99,14 +115,49 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_library/files': {
+      id: '/_library/files'
+      path: '/files'
+      fullPath: '/files'
+      preLoaderRoute: typeof LibraryFilesRouteImport
+      parentRoute: typeof LibraryRoute
+    }
+    '/_library/documents/$documentId': {
+      id: '/_library/documents/$documentId'
+      path: '/documents/$documentId'
+      fullPath: '/documents/$documentId'
+      preLoaderRoute: typeof LibraryDocumentsDocumentIdRouteImport
+      parentRoute: typeof LibraryRoute
+    }
+    '/_library/decks/$deckId': {
+      id: '/_library/decks/$deckId'
+      path: '/decks/$deckId'
+      fullPath: '/decks/$deckId'
+      preLoaderRoute: typeof LibraryDecksDeckIdRouteImport
+      parentRoute: typeof LibraryRoute
+    }
   }
 }
 
+interface LibraryRouteChildren {
+  LibraryFilesRoute: typeof LibraryFilesRoute
+  LibraryDecksDeckIdRoute: typeof LibraryDecksDeckIdRoute
+  LibraryDocumentsDocumentIdRoute: typeof LibraryDocumentsDocumentIdRoute
+}
+
+const LibraryRouteChildren: LibraryRouteChildren = {
+  LibraryFilesRoute: LibraryFilesRoute,
+  LibraryDecksDeckIdRoute: LibraryDecksDeckIdRoute,
+  LibraryDocumentsDocumentIdRoute: LibraryDocumentsDocumentIdRoute,
+}
+
+const LibraryRouteWithChildren =
+  LibraryRoute._addFileChildren(LibraryRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LibraryRoute: LibraryRouteWithChildren,
   ApiSplatRoute: ApiSplatRoute,
-  DecksDeckIdRoute: DecksDeckIdRoute,
-  DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

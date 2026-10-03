@@ -8,6 +8,7 @@ test("a document is created from the library, edited block by block, and survive
 }) => {
   const title = `Quiz ${Date.now()}`;
   await signIn(page);
+  await page.getByRole("link", { name: "Files" }).click();
   await page.getByLabel("New file").fill(title);
   await page.getByLabel("Kind").selectOption("document");
   await page.getByRole("button", { name: "Create file" }).click();
@@ -35,17 +36,19 @@ test("a document is created from the library, edited block by block, and survive
   await expect(pageOne.locator("p", { hasText: "First question" })).toBeVisible();
   await expect(page.getByText("Revision 4", { exact: false })).toBeVisible();
 
-  await page.getByRole("link", { name: "Alchemy + Effect starter" }).click();
+  await page.getByRole("link", { name: "Files" }).click();
   await expect(page.getByRole("link", { name: title })).toBeVisible();
   // Files belong to whoever created them.
   await page.getByRole("button", { name: "Sign out" }).click();
   await signIn(page, "bob@example.com");
+  await page.getByRole("link", { name: "Files" }).click();
   await expect(page.getByRole("link", { name: title })).toHaveCount(0);
 });
 
 test("a deck is created from the library and gains and loses slides", async ({ page }) => {
   const title = `Lesson ${Date.now()}`;
   await signIn(page);
+  await page.getByRole("link", { name: "Files" }).click();
   await page.getByLabel("New file").fill(title);
   await page.getByLabel("Kind").selectOption("deck");
   await page.getByRole("button", { name: "Create file" }).click();
@@ -66,6 +69,7 @@ test("a deck is created from the library and gains and loses slides", async ({ p
 
 test("the example files paginate into several pages and render every slide", async ({ page }) => {
   await signIn(page);
+  await page.getByRole("link", { name: "Files" }).click();
   await page.getByRole("button", { name: "Algebra worksheet" }).click();
   await expect(
     page.getByRole("region", { name: "Algebra 1: Solving Linear Equations" }),
@@ -75,7 +79,7 @@ test("the example files paginate into several pages and render every slide", asy
   await expect(pages.nth(1)).toBeVisible();
   await expect(pages.last()).toContainText("Challenge");
 
-  await page.goto("/");
+  await page.goto("/files");
   await page.getByRole("button", { name: "Lesson deck" }).click();
   await expect(page.getByRole("figure", { name: "Slide 7" })).toContainText("Exit ticket");
 });

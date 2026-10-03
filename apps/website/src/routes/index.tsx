@@ -1,168 +1,39 @@
-import { useAtom, useAtomSuspense } from "@effect/atom-react";
-import type { Deck } from "@starter/contract/decks";
-import { type Document, defaultPageSettings, type Inline } from "@starter/contract/documents";
-import { Title } from "@starter/contract/versioning";
-import { createFileRoute, Link, useHydrated, useNavigate } from "@tanstack/react-router";
-import { Exit, Schema } from "effect";
-import { AsyncResult } from "effect/reactivity";
-import { Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { ArrowUpIcon } from "lucide-react";
 
-import { client, meAtom } from "../atoms.ts";
-import { algebraWorksheet, geometryQuiz, linearEquationsLesson } from "../examples.ts";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
-export const Route = createFileRoute("/")({ component: FilesPage });
+export const Route = createFileRoute("/")({ component: NewChat });
 
-const filesAtom = client.query("files", "list", { reactivityKeys: ["files"] });
-const createDocumentAtom = client.mutation("files", "createDocument");
-const createDeckAtom = client.mutation("files", "createDeck");
-
-const NewFile = Schema.Struct({
-  kind: Schema.Literals(["document", "deck"]),
-  title: Title,
-});
-
-const text = (value: string): ReadonlyArray<Inline> => [{ type: "text", text: value }];
-
-/** A new file starts with one item so its page is never empty. */
-const newDocument = (title: string): Document => ({
-  meta: { title, page: defaultPageSettings },
-  items: [{ id: crypto.randomUUID(), type: "paragraph", inlines: text("Start writing.") }],
-});
-const newDeck = (title: string): Deck => ({
-  meta: { title },
-  items: [{ id: crypto.randomUUID(), layout: "title", title: text(title), body: [] }],
-});
-
-function FilesPage() {
+/** An empty chat. Sending is not wired up yet, so the composer only shows where it will go. */
+function NewChat() {
   return (
-    <Suspense fallback={<p role="status">Loading files…</p>}>
-      <SignedIn>
-        <Files />
-      </SignedIn>
-    </Suspense>
-  );
-}
-
-/** Files belong to a signed-in user, so signed-out visitors see an invitation instead. */
-function SignedIn({ children }: Readonly<{ children: React.ReactNode }>) {
-  const me = useAtomSuspense(meAtom, { includeFailure: true });
-  if (AsyncResult.isFailure(me)) {
-    return <p className="empty">Sign in with Google to create documents and decks.</p>;
-  }
-  return children;
-}
-
-function Files() {
-  const hydrated = useHydrated();
-  const navigate = useNavigate();
-  const files = useAtomSuspense(filesAtom, { includeFailure: true });
-  const [createdDocument, createDocument] = useAtom(createDocumentAtom, { mode: "promiseExit" });
-  const [createdDeck, createDeck] = useAtom(createDeckAtom, { mode: "promiseExit" });
-  const creating = AsyncResult.isWaiting(createdDocument) || AsyncResult.isWaiting(createdDeck);
-  const failed = AsyncResult.isFailure(createdDocument) || AsyncResult.isFailure(createdDeck);
-  const busy = !hydrated || creating;
-
-  const keys = ["files"];
-  const openDocument = async (document: Document) => {
-    const result = await createDocument({
-      payload: document,
-      reactivityKeys: keys,
-    });
-    if (Exit.isSuccess(result) && result.value.kind === "document") {
-      await navigate({ to: "/documents/$documentId", params: { documentId: result.value.id } });
-    }
-  };
-  const openDeck = async (deck: Deck) => {
-    const result = await createDeck({ payload: deck, reactivityKeys: keys });
-    if (Exit.isSuccess(result) && result.value.kind === "deck") {
-      await navigate({ to: "/decks/$deckId", params: { deckId: result.value.id } });
-    }
-  };
-
-  return (
-    <section aria-label="Your files">
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          // The inputs' constraint attributes mirror NewFile, so a decode failure is a bug, not user error.
-          const input = Schema.decodeUnknownSync(NewFile)(
-            Object.fromEntries(new FormData(event.currentTarget)),
-          );
-          switch (input.kind) {
-            case "document":
-              return openDocument(newDocument(input.title));
-            case "deck":
-              return openDeck(newDeck(input.title));
-            default: {
-              const exhaustive: never = input.kind;
-              return exhaustive;
-            }
-          }
-        }}
-      >
-        <label htmlFor="title">New file</label>
-        <input
-          id="title"
-          name="title"
-          disabled={busy}
-          required
-          pattern=".*\S.*"
-          maxLength={200}
-          placeholder="Unit 2 quiz"
-        />
-        <label htmlFor="kind">Kind</label>
-        <select id="kind" name="kind" disabled={busy}>
-          <option value="document">Document</option>
-          <option value="deck">Slide deck</option>
-        </select>
-        <button type="submit" disabled={busy}>
-          {creating ? "Creating…" : "Create file"}
-        </button>
-      </form>
-      <p className="hint">Or start from an example:</p>
-      <p className="examples">
-        <button type="button" disabled={busy} onClick={() => openDocument(algebraWorksheet)}>
-          Algebra worksheet
-        </button>
-        <button type="button" disabled={busy} onClick={() => openDocument(geometryQuiz)}>
-          Geometry quiz
-        </button>
-        <button type="button" disabled={busy} onClick={() => openDeck(linearEquationsLesson)}>
-          Lesson deck
-        </button>
-      </p>
-      {failed ? (
-        <p role="alert" className="error">
-          Could not create the file. Your title is still here — try again.
+    <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24">
+      <div className="w-full max-w-2xl">
+        <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">
+          What should we work on?
+        </h1>
+        <p className="mt-2 text-center text-sm text-muted-foreground">
+          Ask anything to start your first chat.
         </p>
-      ) : null}
-      {AsyncResult.isFailure(files) ? (
-        <p role="alert" className="error">
-          Could not load your files. Reload to try again.
-        </p>
-      ) : (
-        <>
-          {files.value.length === 0 ? (
-            <p className="empty">No files yet. Create your first one.</p>
-          ) : null}
-          <ul aria-label="Your files">
-            {files.value.map((file) => (
-              <li key={file.id}>
-                {file.kind === "document" ? (
-                  <Link to="/documents/$documentId" params={{ documentId: file.id }}>
-                    {file.title}
-                  </Link>
-                ) : (
-                  <Link to="/decks/$deckId" params={{ deckId: file.id }}>
-                    {file.title}
-                  </Link>
-                )}
-                <span className="hint"> · {file.kind}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
+        <form
+          className="mt-8 rounded-2xl border bg-card p-2 shadow-xs focus-within:ring-2 focus-within:ring-ring/30"
+          onSubmit={(event) => event.preventDefault()}
+        >
+          <Textarea
+            name="message"
+            aria-label="Message"
+            placeholder="Message the agent…"
+            className="min-h-20 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+          <div className="flex justify-end">
+            <Button type="submit" size="icon" aria-label="Send" disabled>
+              <ArrowUpIcon />
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

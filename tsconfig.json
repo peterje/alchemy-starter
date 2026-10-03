@@ -16,6 +16,6 @@
     "skipLibCheck": true,
     "types": ["vite/client", "@cloudflare/workers-types"]
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/contract/**/*.ts", "alchemy.run.ts"],
+  "include": ["apps/api/**/*.ts", "packages/contract/**/*.ts", "alchemy.run.ts"],
   "exclude": ["**/*.test.ts"]
 }
