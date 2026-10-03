@@ -56,7 +56,15 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     });
     const usersGroup = HttpApiBuilder.group(Api, "users", (handlers) =>
       handlers.handleAll({
-        list: () => Effect.orDie(listUsers(undefined)),
+        // SPIKE: time three identical queries in one request; never merge.
+        list: () =>
+          Effect.gen(function* () {
+            for (const attempt of [1, 2, 3]) {
+              const [duration] = yield* Effect.timed(Effect.orDie(listUsers(undefined)));
+              yield* Effect.log(`spike query ${attempt}: ${duration}`);
+            }
+            return yield* Effect.orDie(listUsers(undefined));
+          }),
         create: ({ payload }) =>
           Effect.orDie(insertUser({ id: UserId.make(crypto.randomUUID()), name: payload.name })),
       }),
