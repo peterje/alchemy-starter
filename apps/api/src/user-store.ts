@@ -1,6 +1,7 @@
 import { type Document, DocumentId } from "@starter/contract/documents";
 import { FileRef } from "@starter/contract/files";
 import { type Deck, DeckId } from "@starter/contract/slides";
+import { UserId } from "@starter/contract/user";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Clock, Effect, Schema } from "effect";
 
@@ -21,6 +22,10 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
     const decks = yield* DeckObject;
     return Effect.gen(function* () {
       const db = yield* ObjectDatabase;
+      // Objects are addressed by their user's ID, so the object's name is the owner of its files.
+      const owner = Schema.decodeUnknownSync(UserId)(
+        (yield* Cloudflare.DurableObjectState).id.name,
+      );
 
       // Creating a file writes to two objects. The file's object is authoritative and this row is
       // the user's pointer to it, so a retry after a partial failure converges instead of diverging.
@@ -46,12 +51,13 @@ export default class UserStore extends Cloudflare.DurableObject<UserStore>()(
           }),
         createDocument: Effect.fn("UserStore.createDocument")(function* (document: Document) {
           const id = DocumentId.make(crypto.randomUUID());
-          yield* documents.getByName(id).set(document);
+          // A fresh random ID cannot already belong to someone else.
+          yield* Effect.orDie(documents.getByName(id).create({ owner, document }));
           return yield* remember({ kind: "document", id, title: document.meta.title });
         }),
         createDeck: Effect.fn("UserStore.createDeck")(function* (deck: Deck) {
           const id = DeckId.make(crypto.randomUUID());
-          yield* decks.getByName(id).set(deck);
+          yield* Effect.orDie(decks.getByName(id).create({ owner, deck }));
           return yield* remember({ kind: "deck", id, title: deck.meta.title });
         }),
       };

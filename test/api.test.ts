@@ -157,6 +157,31 @@ test(
 );
 
 test(
+  "a file belongs to whoever created it: anyone else is told it does not exist",
+  Effect.gen(function* () {
+    const { websiteUrl } = yield* stack;
+    const { api: alice } = yield* clientFor("Alice");
+    const { api: bob } = yield* clientFor("Bob");
+    const file = yield* alice.files.createDocument({ payload: worksheet });
+    const params = { documentId: DocumentId.make(file.id) };
+
+    expect((yield* alice.documents.get({ params })).meta.title).toBe("Worksheet");
+    const refused = { _tag: "DocumentNotFound" };
+    expect(yield* Effect.flip(bob.documents.get({ params }))).toMatchObject(refused);
+    expect(yield* Effect.flip(bob.documents.set({ params, payload: worksheet }))).toMatchObject(
+      refused,
+    );
+    expect(
+      yield* Effect.flip(
+        bob.documents.apply({ params, payload: { operationId: "bob-edit", upserts: [] } }),
+      ),
+    ).toMatchObject(refused);
+    expect((yield* HttpClient.get(`${websiteUrl}/api/documents/${file.id}`)).status).toBe(401);
+  }),
+  { timeout: 120_000 },
+);
+
+test(
   "a document object versions its blocks, replays operations, and reports conflicts",
   Effect.gen(function* () {
     const { api } = yield* clientFor("Alice");

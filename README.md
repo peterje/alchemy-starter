@@ -6,7 +6,7 @@ A small demo with **Effect, Alchemy, TanStack Start, PlanetScale Postgres, and W
 
 The UI signs in with Google, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
 
-**Files are not yet authorized individually.** Signing in decides whose file list you see, but a document or deck is reachable by anyone holding its link. Check ownership on each file before storing private data.
+**Every file belongs to whoever created it.** Each document and deck object records its owner and checks the signed-in user on every read and write; anyone else is told the file does not exist. Sharing files with other people is not built yet.
 
 ## Run
 
