@@ -1,4 +1,4 @@
-import type { Slide } from "@starter/contract/slides";
+import type { Slide } from "@starter/contract/decks";
 import { type ReactNode, useCallback } from "react";
 
 import { DocumentBlock, Inlines } from "./blocks.tsx";

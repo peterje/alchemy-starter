@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Stacks that `bun run provision` and CI deploy by path.
+  "workspaces": { ".": { "entry": ["stacks/*.ts"] } },
+  // Resource props are exported for callers even when only the resource type uses them today.
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": [
+    // `alchemy.run.ts` starts the emulator from node_modules/.bin, which knip cannot trace.
+    "@workos/emulate",
+    // Knip does not see binaries run through `bun --bun`.
+    "oxlint",
+    // `cloudflare:workers` is a workerd built-in, not a package.
+    "cloudflare",
+  ],
+}

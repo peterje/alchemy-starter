@@ -1,6 +1,6 @@
 import { Api } from "@starter/contract/api";
+import { DeckNotFound } from "@starter/contract/decks";
 import { DocumentNotFound } from "@starter/contract/documents";
-import { DeckNotFound } from "@starter/contract/slides";
 import { CurrentUser } from "@starter/contract/user";
 import { InvalidOperation } from "@starter/contract/versioning";
 import { Effect } from "effect";

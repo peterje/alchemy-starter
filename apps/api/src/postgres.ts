@@ -3,7 +3,7 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import * as Planetscale from "alchemy/Planetscale";
 import { Effect } from "effect";
 
-import { Database } from "./database.ts";
+import { Database } from "./shared-database.ts";
 
 /**
  * The stage's Postgres branch behind Hyperdrive. The database itself belongs to

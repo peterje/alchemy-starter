@@ -6,9 +6,9 @@ import { HttpRouter, HttpServer } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 
 import { AuthenticationMiddleware, AuthHandlers, SessionsHandlers, WorkOSAuth } from "./auth.ts";
-import { region } from "./database.ts";
 import { DecksHandlers, DocumentsHandlers, FilesHandlers } from "./files.ts";
 import { Postgres } from "./postgres.ts";
+import { region } from "./shared-database.ts";
 import { Users, UsersHandlers } from "./users.ts";
 
 /**

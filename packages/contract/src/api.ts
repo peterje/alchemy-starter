@@ -1,8 +1,8 @@
 import { HttpApi } from "effect/http-api";
 
+import { DecksGroup } from "./decks.ts";
 import { DocumentsGroup } from "./documents.ts";
 import { FilesGroup } from "./files.ts";
-import { DecksGroup } from "./slides.ts";
 import { AuthGroup, SessionsGroup, UsersGroup } from "./user.ts";
 
 /** Every group behind one origin. The Worker serves users from Postgres and files from their objects. */

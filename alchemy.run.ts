@@ -6,9 +6,9 @@ import * as Output from "alchemy/Output";
 import * as Planetscale from "alchemy/Planetscale";
 import { Config, Effect, Layer } from "effect";
 
-import { region } from "./apps/api/src/database.ts";
+import { region } from "./apps/api/src/shared-database.ts";
 import ApiWorker from "./apps/api/src/worker.ts";
-import * as WorkOS from "./stacks/workos.ts";
+import * as WorkOS from "./providers/workos.ts";
 
 export class Website extends Cloudflare.Website.Vite<Website>()("Website", {
   rootDir: "apps/website",

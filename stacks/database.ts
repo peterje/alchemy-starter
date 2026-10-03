@@ -3,7 +3,7 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import * as Planetscale from "alchemy/Planetscale";
 import { Effect, Layer } from "effect";
 
-import { Database, region } from "../apps/api/src/database.ts";
+import { Database, region } from "../apps/api/src/shared-database.ts";
 
 /**
  * The Postgres database every stage branches from, deployed to the `shared` stage. `bun run

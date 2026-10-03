@@ -1,13 +1,13 @@
 import { expect } from "bun:test";
 
 import { Api } from "@starter/contract/api";
+import { type Deck, DeckId } from "@starter/contract/decks";
 import {
   type Block,
   defaultPageSettings,
   type Document,
   DocumentId,
 } from "@starter/contract/documents";
-import { type Deck, DeckId } from "@starter/contract/slides";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as Test from "alchemy/Test/Bun";
 import { Config, Effect, Layer, Option, Result } from "effect";
@@ -145,7 +145,7 @@ test(
 );
 
 test(
-  "a file belongs to whoever created it: anyone else is told it does not exist",
+  "a document or deck belongs to whoever created it: anyone else is told it does not exist",
   Effect.gen(function* () {
     const { websiteUrl } = yield* stack;
     const { api: alice } = yield* clientFor("Alice");
@@ -154,7 +154,7 @@ test(
     const params = { documentId: DocumentId.make(file.id) };
 
     expect((yield* alice.documents.get({ params })).meta.title).toBe("Worksheet");
-    const refused = { _tag: "DocumentNotFound" };
+    const refused = { _tag: "DocumentNotFound", id: file.id };
     expect(yield* Effect.flip(bob.documents.get({ params }))).toMatchObject(refused);
     expect(yield* Effect.flip(bob.documents.set({ params, payload: worksheet }))).toMatchObject(
       refused,
@@ -165,6 +165,15 @@ test(
       ),
     ).toMatchObject(refused);
     expect((yield* HttpClient.get(`${websiteUrl}/api/documents/${file.id}`)).status).toBe(401);
+
+    // Decks check their owner separately, so cover them too.
+    const deck = yield* alice.files.createDeck({ payload: lesson });
+    const deckParams = { deckId: DeckId.make(deck.id) };
+    const refusedDeck = { _tag: "DeckNotFound", id: deck.id };
+    expect(yield* Effect.flip(bob.decks.get({ params: deckParams }))).toMatchObject(refusedDeck);
+    expect(
+      yield* Effect.flip(bob.decks.set({ params: deckParams, payload: lesson })),
+    ).toMatchObject(refusedDeck);
   }),
 );
 

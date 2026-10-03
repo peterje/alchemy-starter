@@ -1,11 +1,7 @@
 import { useAtom, useAtomSuspense } from "@effect/atom-react";
-import {
-  type Document,
-  defaultPageSettings,
-  DocumentTitle,
-  type Inline,
-} from "@starter/contract/documents";
-import type { Deck } from "@starter/contract/slides";
+import type { Deck } from "@starter/contract/decks";
+import { type Document, defaultPageSettings, type Inline } from "@starter/contract/documents";
+import { Title } from "@starter/contract/versioning";
 import { createFileRoute, Link, useHydrated, useNavigate } from "@tanstack/react-router";
 import { Exit, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
@@ -22,7 +18,7 @@ const createDeckAtom = client.mutation("files", "createDeck");
 
 const NewFile = Schema.Struct({
   kind: Schema.Literals(["document", "deck"]),
-  title: DocumentTitle,
+  title: Title,
 });
 
 const text = (value: string): ReadonlyArray<Inline> => [{ type: "text", text: value }];

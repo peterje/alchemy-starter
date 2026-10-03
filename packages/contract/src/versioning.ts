@@ -9,6 +9,9 @@ import { Schema } from "effect";
  * operation returns its original result.
  */
 
+/** The name a user gives a file of any kind. */
+export const Title = Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(200));
+
 /** Stable identity of an item. Writers address items by id; versions live beside them. */
 export const ItemId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,64}$/u));
 export type ItemId = typeof ItemId.Type;
