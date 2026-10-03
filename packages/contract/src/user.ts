@@ -47,13 +47,13 @@ export class Authentication extends HttpApiMiddleware.Service<
 }) {}
 
 /**
- * Sign in with GitHub through WorkOS AuthKit. OAuth dictates these redirect routes; the
+ * Sign in with Google through WorkOS AuthKit. OAuth dictates these redirect routes; the
  * callback ends by creating an ordinary session.
  */
 export class AuthGroup extends HttpApiGroup.make("auth")
   .add(
-    HttpApiEndpoint.get("github", "/github"),
-    HttpApiEndpoint.get("githubCallback", "/github/callback", {
+    HttpApiEndpoint.get("signIn", "/sign-in"),
+    HttpApiEndpoint.get("callback", "/callback", {
       query: { code: Schema.String, state: Schema.String },
       error: HttpApiError.Unauthorized,
     }),

@@ -74,11 +74,11 @@ const newUser = (name: string) =>
     return email;
   });
 
-/** Signs in "with GitHub" on the emulator's login page, as a browser would; returns the cookie. */
+/** Signs in "with Google" on the emulator's login page, as a browser would; returns the cookie. */
 const signIn = (email: string) =>
   Effect.gen(function* () {
     const { websiteUrl } = yield* stack;
-    const start = yield* HttpClient.get(`${websiteUrl}/api/auth/github`);
+    const start = yield* HttpClient.get(`${websiteUrl}/api/auth/sign-in`);
     const authorize = location(start);
     const chosen = yield* HttpClientRequest.post(
       new URL("/user_management/authorize", authorize),
@@ -125,7 +125,7 @@ const lesson: Deck = {
 };
 
 test(
-  "signing in with GitHub creates a session and records the user",
+  "signing in with Google creates a session and records the user",
   Effect.gen(function* () {
     const { api } = yield* clientFor("Dana");
 
@@ -149,7 +149,7 @@ test(
       expect((yield* HttpClient.get(`${websiteUrl}${route}`)).status).toBe(401);
     }
     const forged = yield* HttpClient.get(
-      `${websiteUrl}/api/auth/github/callback?code=stolen&state=guessed`,
+      `${websiteUrl}/api/auth/callback?code=stolen&state=guessed`,
     ).pipe(Effect.provide(manualRedirects));
     expect(forged.status).toBe(401);
   }),

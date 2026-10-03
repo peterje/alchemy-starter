@@ -47,13 +47,13 @@ function Account() {
   const hydrated = useHydrated();
   const me = useAtomSuspense(meAtom, { includeFailure: true });
   const [signingOut, signOut] = useAtom(signOutAtom, { mode: "promiseExit" });
-  // Signing in is a full-page navigation: GitHub and WorkOS redirect back to the callback, which
+  // Signing in is a full-page navigation: Google and WorkOS redirect back to the callback, which
   // creates the session cookie.
   if (AsyncResult.isFailure(me)) {
     return (
       <p className="account">
-        <a className="button" href="/api/auth/github">
-          Sign in with GitHub
+        <a className="button" href="/api/auth/sign-in">
+          Sign in with Google
         </a>
       </p>
     );

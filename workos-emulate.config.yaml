@@ -1,16 +1,14 @@
 # Users of the local WorkOS emulator, which `bun run dev` and the tests start. Each signs in
-# "with GitHub" on the emulator's login page. Ids are pinned because a user's files live in a
-# Durable Object keyed by their id; the passwords let the API tests sign in without a browser.
+# "with Google" on the emulator's login page. Ids are pinned because a user's files live in a
+# Durable Object keyed by their id.
 users:
   - id: user_alice
     email: alice@example.com
     first_name: Alice
-    password: alice-password
     email_verified: true
-    oauth_provider: GitHubOAuth
+    oauth_provider: GoogleOAuth
   - id: user_bob
     email: bob@example.com
     first_name: Bob
-    password: bob-password
     email_verified: true
-    oauth_provider: GitHubOAuth
+    oauth_provider: GoogleOAuth

@@ -51,7 +51,7 @@ function FilesPage() {
 function SignedIn({ children }: Readonly<{ children: React.ReactNode }>) {
   const me = useAtomSuspense(meAtom, { includeFailure: true });
   if (AsyncResult.isFailure(me)) {
-    return <p className="empty">Sign in with GitHub to create documents and decks.</p>;
+    return <p className="empty">Sign in with Google to create documents and decks.</p>;
   }
   return children;
 }

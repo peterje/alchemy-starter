@@ -2,9 +2,9 @@
 
 Fork this repository, open it in Claude Code, and say **set this up**. The agent follows the bootstrap guide in `AGENTS.md` from install to a production URL.
 
-A small demo with **Effect, Alchemy, TanStack Start, PlanetScale Postgres, and WorkOS**. People sign in with GitHub; their accounts live in Postgres. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
+A small demo with **Effect, Alchemy, TanStack Start, PlanetScale Postgres, and WorkOS**. People sign in with Google; their accounts live in Postgres. Each document and slide deck is a Durable Object with its own SQLite database, and each user's object indexes the files they created. No ORM, repository adapters, or mock storage.
 
-The UI signs in with GitHub, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
+The UI signs in with Google, lists each user's files, creates documents and decks from scratch or from an example, and edits them block by block. Documents render as real pages and decks as real slides, so what prints is what the screen shows. Effect `AtomHttpApi` shares the server's schema-first contract and refreshes the affected queries after mutations.
 
 **Files are not yet authorized individually.** Signing in decides whose file list you see, but a document or deck is reachable by anyone holding its link. Check ownership on each file before storing private data.
 
@@ -57,7 +57,7 @@ Local Alchemy runs need Cloudflare and PlanetScale credentials: run `bun alchemy
 | `apps/website/src/slide-deck.tsx`                   | Real-size 16:9 slides scaled to fit the screen                              |
 | `apps/website/src/math.ts`                          | LaTeX to KaTeX HTML                                                         |
 | `apps/website/src/examples.ts`                      | Example files that exercise every block kind and slide layout               |
-| `apps/website/src/routes/__root.tsx`                | TanStack Start document and the account bar: sign in with GitHub, sign out  |
+| `apps/website/src/routes/__root.tsx`                | TanStack Start document and the account bar: sign in with Google, sign out  |
 | `apps/website/src/routes/api.$.ts`                  | Same-origin API route forwarding through an Alchemy service binding         |
 | `test/api.test.ts`                                  | Integration tests against actual Workers, objects, and Postgres             |
 | `test/browser/files.pw.ts`                          | Playwright coverage of creating, editing, and paginating files              |
@@ -66,7 +66,7 @@ The workspace is split by runtime. `packages/contract` runs everywhere and depen
 
 ## Sign-in
 
-People sign in with GitHub through [WorkOS AuthKit](https://workos.com/docs/authkit). AuthKit owns identities, the GitHub OAuth exchange, and sessions on its side; the API owns the session resource. `GET /api/auth/github` sends the browser to AuthKit's page, which offers only GitHub and runs any step sign-in needs, such as verifying a new email; the callback exchanges the code, records the user, and sets a sealed, HttpOnly `session` cookie. Every endpoint behind `Authentication` verifies the access token inside it against WorkOS's signing keys and refreshes it when it expires. Signing out is deleting a session: `DELETE /api/sessions/current`, or another device's from `GET /api/sessions`. A revoked session's cookie keeps working until its short-lived access token expires, because tokens are checked without a call to WorkOS.
+People sign in with Google through [WorkOS AuthKit](https://workos.com/docs/authkit). AuthKit owns identities, the Google OAuth exchange, and sessions on its side; the API owns the session resource. `GET /api/auth/sign-in` sends the browser to AuthKit's page, which offers only Google and runs any step sign-in needs, such as verifying a new email; the callback exchanges the code, records the user, and sets a sealed, HttpOnly `session` cookie. Every endpoint behind `Authentication` verifies the access token inside it against WorkOS's signing keys and refreshes it when it expires. Signing out is deleting a session: `DELETE /api/sessions/current`, or another device's from `GET /api/sessions`. A revoked session's cookie keeps working until its short-lived access token expires, because tokens are checked without a call to WorkOS.
 
 Local runs and tests use WorkOS's own [emulator](https://github.com/workos/emulate), which `alchemy dev` starts, so they need no WorkOS account and leave nothing behind. Pull request previews use a WorkOS Staging environment, each registering its own callback URI, and production uses WorkOS Production.
 

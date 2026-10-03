@@ -67,8 +67,8 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     // website receives its own sign-ins.
     const callbackUrl = (request: HttpServerRequest.HttpServerRequest) =>
       Option.match(HttpServerRequest.toURL(request), {
-        onNone: () => "/api/auth/github/callback",
-        onSome: (url) => new URL("/api/auth/github/callback", url.origin).toString(),
+        onNone: () => "/api/auth/callback",
+        onSome: (url) => new URL("/api/auth/callback", url.origin).toString(),
       });
     const stateCookie = "auth_state";
     const stateCookieOptions = {
@@ -83,7 +83,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
 
     const authGroup = HttpApiBuilder.group(Api, "auth", (handlers) =>
       handlers.handleAll({
-        github: ({ request }) => {
+        signIn: ({ request }) => {
           // The callback compares this with the state WorkOS returns, so another site cannot
           // complete a sign-in in this browser.
           const state = crypto.randomUUID();
@@ -94,7 +94,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
             ),
           );
         },
-        githubCallback: ({ query, request }) =>
+        callback: ({ query, request }) =>
           Effect.gen(function* () {
             const expected = request.cookies[stateCookie];
             if (expected !== query.state) {

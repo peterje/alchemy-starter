@@ -47,7 +47,7 @@ export interface Device {
 }
 
 /**
- * Sign-in through WorkOS AuthKit with GitHub, and the sessions that follow it. `WORKOS_API_URL`
+ * Sign-in through WorkOS AuthKit with Google, and the sessions that follow it. `WORKOS_API_URL`
  * points local runs and tests at the WorkOS emulator; deployed stages use the real API.
  */
 export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
@@ -101,7 +101,7 @@ export class WorkOSAuth extends Context.Service<WorkOSAuth>()("WorkOSAuth", {
 
     return {
       /**
-       * Sends the browser to AuthKit's sign-in page, configured to offer only GitHub. The page stays
+       * Sends the browser to AuthKit's sign-in page, configured to offer only Google. The page stays
        * in the flow because AuthKit runs the steps around sign-in, such as verifying an email.
        */
       authorizeUrl: ({ redirectUri, state }: { redirectUri: string; state: string }) => {
