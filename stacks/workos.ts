@@ -56,8 +56,11 @@ export const providers = () =>
             : yield* Services.workos
                 .CreateRedirectUrisController({ uri: news.uri })
                 .pipe(Effect.flatMap(Schema.decodeUnknownEffect(Registered)));
-          // A changed URI leaves the previous registration behind; remove it.
-          if (output !== undefined && output.id !== registered.id) yield* remove(output.id);
+          // A changed URI leaves the previous registration behind; remove whatever WorkOS has for it.
+          if (output !== undefined && output.uri !== news.uri) {
+            const previous = yield* find(output.uri);
+            if (Option.isSome(previous)) yield* remove(previous.value.id);
+          }
           return registered;
         }).pipe(Effect.provide(workos)),
       // Deletes whatever WorkOS has registered for the URI now: it may have been removed and
