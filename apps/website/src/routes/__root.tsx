@@ -1,5 +1,5 @@
 import { RegistryProvider } from "@effect/atom-react";
-import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
+import { HeadContent, Outlet, Scripts, createRootRoute, useHydrated } from "@tanstack/react-router";
 import { PanelLeftCloseIcon, PanelLeftIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -44,6 +44,7 @@ function App() {
  * whether the sidebar is open or closed.
  */
 function SidebarToggle() {
+  const hydrated = useHydrated();
   const { open, openMobile, isMobile, toggleSidebar } = useSidebar();
   const visible = isMobile ? openMobile : open;
   return (
@@ -52,6 +53,8 @@ function SidebarToggle() {
       size="icon-sm"
       aria-label="Toggle sidebar"
       aria-pressed={visible}
+      // Server-rendered markup has no click handler until React hydrates it.
+      disabled={!hydrated}
       onClick={toggleSidebar}
       className="fixed top-3 left-3 z-50"
     >
