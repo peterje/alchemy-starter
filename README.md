@@ -72,6 +72,12 @@ The Worker reaches its branch through [Hyperdrive](https://developers.cloudflare
 
 Each pull request deploys to its own `pr-<number>` stage the moment it is pushed, without waiting for checks, and the stack comments the preview URL on the pull request. Verification runs beside it, each suite on a stage and branch of its own that later pushes reuse. Closing the pull request destroys all three. Branch protection, declared in `stacks/github.ts`, only lets a pull request merge once its checks pass against the latest `main`, so a merge deploys to production without running them again.
 
+## Observability
+
+Every request is one trace in [Workers Observability](https://developers.cloudflare.com/workers/observability/): the website Worker starts it, and Cloudflare carries it into the API Worker and each Durable Object call. `Cloudflare.Telemetry()` in `worker.ts` places the Effect spans from each `Effect.fn` inside it, including `@effect/sql`'s query spans, which matter because Cloudflare does not trace Hyperdrive. Workers Logs is on for both Workers. Traces are in beta, so span names may change.
+
+To send traces and logs to Axiom, Honeycomb, or any OpenTelemetry backend, leave the code alone and export from Cloudflare: add a [`Cloudflare.Workers.ObservabilityDestination`](https://alchemy.run/cloudflare/observability/axiom-observability/) per signal and list it in each Worker's `observability.traces.destinations` or `logs.destinations`. Do not add a second tracer in the Worker; Effect has one, and `Cloudflare.Telemetry()` provides it.
+
 ## Versioned files
 
 A document is page settings plus an ordered list of blocks; a deck is a title plus slides. Both are versioned files: every item carries the version it was last written at, and the file carries a revision. An operation upserts and deletes items against the versions the writer read and applies each one independently, so a stale block comes back as a conflict with the winner while the rest land. Metadata and order are last-writer-wins. Replaying an operation ID returns its original result. `versioning.ts` derives the state, operation, and result schemas of a file kind from its metadata and item schemas, `versioned.ts` applies an operation to a state, and each object persists its own file as one row in its SQLite next to its operation log.
